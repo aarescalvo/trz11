@@ -234,9 +234,9 @@ export async function GET(request: NextRequest) {
         (index + 1).toString(),
         tipoAnimalStr,
         sexo,
+        animal.raza || '',
         peso ? peso.toFixed(1) : '',
         animal.caravana || '',
-        '', // Tipificación
         animal.corralId || tropa.corral?.nombre || ''
       ]
     })
@@ -246,9 +246,9 @@ export async function GET(request: NextRequest) {
       'N\u00ba',
       'Tipo',
       'Sexo',
+      'Raza',
       'Peso Entrada (kg)',
       'Caravana',
-      'Tipificaci\u00f3n',
       'Corral'
     ]
 
@@ -269,11 +269,11 @@ export async function GET(request: NextRequest) {
       },
       columnStyles: {
         0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 22, halign: 'center' },
-        2: { cellWidth: 12, halign: 'center' },
-        3: { cellWidth: 30, halign: 'right' },
-        4: { cellWidth: 35, halign: 'center' },
-        5: { cellWidth: 25 },
+        1: { cellWidth: 20, halign: 'center' },
+        2: { cellWidth: 10, halign: 'center' },
+        3: { cellWidth: 22, halign: 'center' },
+        4: { cellWidth: 28, halign: 'right' },
+        5: { cellWidth: 35, halign: 'center' },
         6: { cellWidth: 20, halign: 'center' }
       },
       margin: { left: margin, right: margin },

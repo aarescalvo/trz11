@@ -26,14 +26,19 @@ interface Tropa {
   dte: string
   guia: string
   fechaRecepcion: string
+  observaciones?: string
   corral?: { nombre: string }
   productor?: { nombre: string; cuit: string }
-  usuarioFaena: { nombre: string; cuit: string }
+  usuarioFaena?: { nombre: string; cuit: string }
   pesajeCamion?: {
     patenteChasis: string
     patenteAcoplado?: string
     choferNombre?: string
     choferDni?: string
+    pesoBruto?: number
+    pesoTara?: number
+    pesoNeto?: number
+    numeroTicket?: number
     transportista?: { nombre: string; cuit: string }
     precintos?: string
   }
@@ -44,6 +49,7 @@ interface Tropa {
     caravana?: string
     pesoVivo?: number
     raza?: string
+    pesajeIndividual?: { peso?: number }
   }>
 }
 
@@ -306,17 +312,18 @@ export function Planilla01Module({ operador }: Props) {
 
       autoTable(doc, {
         startY: y,
-        head: [['N\u00ba', 'TIPO', 'PESO ENTRADA (kg)', 'CARAVANA', 'CORRAL']],
-        body: animalesData.map(row => [row[0], row[2], row[4], row[1], tropaSeleccionada.corral?.nombre || '']),
+        head: [['N\u00ba', 'TIPO', 'RAZA', 'PESO ENTRADA (kg)', 'CARAVANA', 'CORRAL']],
+        body: animalesData.map(row => [row[0], row[2], row[3], row[4], row[1], tropaSeleccionada.corral?.nombre || '']),
         theme: 'grid',
         styles: { fontSize: 7, cellPadding: 1.5 },
         headStyles: { fillColor: [200, 200, 200], textColor: [0, 0, 0], fontStyle: 'bold' },
         columnStyles: {
           0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 22, halign: 'center' },
-          2: { cellWidth: 30, halign: 'right' },
-          3: { cellWidth: 35, halign: 'center' },
-          4: { cellWidth: 20, halign: 'center' }
+          1: { cellWidth: 20, halign: 'center' },
+          2: { cellWidth: 20, halign: 'center' },
+          3: { cellWidth: 28, halign: 'right' },
+          4: { cellWidth: 30, halign: 'center' },
+          5: { cellWidth: 18, halign: 'center' }
         },
         margin: { left: m, right: m }
       })
@@ -446,7 +453,7 @@ export function Planilla01Module({ operador }: Props) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="space-y-4">
         <EditableBlock bloqueId="header" label="Encabezado">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -473,9 +480,10 @@ export function Planilla01Module({ operador }: Props) {
           </div>
         </EditableBlock>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-[320px_1fr] gap-4">
+          {/* Lista de tropas */}
           <EditableBlock bloqueId="lista-tropas" label="Lista de Tropas">
-            <Card className="border-0 shadow-md lg:col-span-1">
+            <Card className="border-0 shadow-md">
               <CardHeader className="bg-stone-50">
                 <CardTitle className="text-lg">
                   <TextoEditable id="planilla01-seleccionar-tropa" original="Seleccionar Tropa" tag="span" />
@@ -505,7 +513,7 @@ export function Planilla01Module({ operador }: Props) {
                   </button>
                 )}
               </CardHeader>
-              <CardContent className="p-0 max-h-[500px] overflow-y-auto">
+              <CardContent className="p-0 max-h-[600px] overflow-y-auto">
                 {loading ? (
                   <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-amber-500" /></div>
                 ) : tropas.length === 0 ? (
@@ -535,15 +543,21 @@ export function Planilla01Module({ operador }: Props) {
             </Card>
           </EditableBlock>
 
+          {/* Vista Previa */}
           <EditableBlock bloqueId="vista-previa" label="Vista Previa">
-            <Card className="border-0 shadow-md lg:col-span-2">
+            <Card className="border-0 shadow-md">
               <CardHeader className="bg-stone-50">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Eye className="w-5 h-5" />
                   <TextoEditable id="planilla01-vista-previa" original="Vista Previa" tag="span" />
+                  {tropaSeleccionada && (
+                    <Badge className="bg-amber-100 text-amber-800 text-base px-4 py-1 ml-auto">
+                      TROPA N\u00b0 {tropaSeleccionada.numero || tropaSeleccionada.codigo}
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 {!tropaSeleccionada ? (
                   <div className="text-center py-12 text-stone-400">
                     <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -551,166 +565,115 @@ export function Planilla01Module({ operador }: Props) {
                       <TextoEditable id="planilla01-seleccione-tropa" original="Seleccione una tropa para ver la planilla" tag="span" />
                     </p>
                   </div>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="border-2 border-stone-300 rounded-lg p-4 bg-white">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="space-y-2">
+                ) : (() => {
+                  const kgNetosCamion = tropaSeleccionada.pesajeCamion?.pesoNeto ?? null
+                  const kgNetosIndiv = (tropaSeleccionada.animales || []).reduce((s, a) => s + (a.pesajeIndividual?.peso || a.pesoVivo || 0), 0)
+                  const diferencia = kgNetosCamion !== null ? kgNetosCamion - kgNetosIndiv : null
+                  const totalAnimales = (tropaSeleccionada.animales || []).length
+                  const pesoPromedio = totalAnimales > 0 ? kgNetosIndiv / totalAnimales : 0
+
+                  return (
+                    <div className="space-y-4">
+                      {/* KPI Cards: Kg Netos y Diferencias */}
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="border rounded-lg p-3 bg-gradient-to-br from-blue-50 to-blue-100">
+                          <p className="text-xs font-medium text-blue-700">KG NETOS CAMIÓN</p>
+                          <p className="text-xl font-bold text-blue-800 mt-1">
+                            {kgNetosCamion !== null ? kgNetosCamion.toFixed(1) : 'S/D'}
+                          </p>
+                        </div>
+                        <div className="border rounded-lg p-3 bg-gradient-to-br from-emerald-50 to-emerald-100">
+                          <p className="text-xs font-medium text-emerald-700">KG NETOS INDIVIDUALES</p>
+                          <p className="text-xl font-bold text-emerald-800 mt-1">
+                            {kgNetosIndiv.toFixed(1)}
+                          </p>
+                        </div>
+                        <div className={`border rounded-lg p-3 bg-gradient-to-br ${diferencia !== null && diferencia < 0 ? 'from-red-50 to-red-100' : 'from-stone-50 to-stone-100'}`}>
+                          <p className="text-xs font-medium text-stone-600">DIFERENCIA</p>
+                          <p className={`text-xl font-bold mt-1 ${diferencia !== null && diferencia < 0 ? 'text-red-700' : 'text-stone-800'}`}>
+                            {diferencia !== null ? ((diferencia >= 0 ? '+' : '') + diferencia.toFixed(1)) : 'S/D'}
+                          </p>
+                        </div>
+                        <div className="border rounded-lg p-3 bg-gradient-to-br from-amber-50 to-amber-100">
+                          <p className="text-xs font-medium text-amber-700">PROMEDIO KG</p>
+                          <p className="text-xl font-bold text-amber-800 mt-1">
+                            {pesoPromedio.toFixed(1)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Datos: Establecimiento + Productor + Usuario Faena */}
+                      <div className="border rounded-lg p-3 bg-white space-y-2">
+                        <div className="flex items-center gap-4 flex-wrap text-xs text-stone-500">
+                          <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5 text-amber-500" /> Solemar Alimentaria S.A.</span>
+                          <span>N° SENASA: 3986</span>
+                          <span>Matrícula: 300</span>
+                          <span>Semana N°: {getSemana(tropaSeleccionada.fechaRecepcion)}</span>
+                          <span>Fecha: {new Date(tropaSeleccionada.fechaRecepcion).toLocaleDateString('es-AR')}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
                           <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-amber-500" />
-                            <span className="font-semibold">Solemar Alimentaria S.A.</span>
+                            <User className="w-4 h-4 text-amber-500 shrink-0" />
+                            <span className="font-semibold">Productor:</span>
+                            <span>{tropaSeleccionada.productor?.nombre || '-'}</span>
+                            <span className="text-stone-400 ml-auto">CUIT: {tropaSeleccionada.productor?.cuit || '-'}</span>
                           </div>
-                          <div className="text-stone-600">
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-nro-senasa-label" original="N° SENASA:" tag="span" />
-                            </span> 3986
-                          </div>
-                          <div className="text-stone-600">
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-matricula-label" original="Matrícula:" tag="span" />
-                            </span> 300
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-blue-500 shrink-0" />
+                            <span className="font-semibold">Usuario Faena:</span>
+                            <span>{tropaSeleccionada.usuarioFaena?.nombre || '-'}</span>
+                            <span className="text-stone-400 ml-auto">CUIT: {tropaSeleccionada.usuarioFaena?.cuit || '-'}</span>
                           </div>
                         </div>
-                        <div className="space-y-2 text-right">
-                          <Badge className="bg-amber-100 text-amber-800 text-base px-4 py-1">
-                            <TextoEditable id="planilla01-badge" original="PLANILLA 01 - BOVINO" tag="span" />
-                          </Badge>
-                          <div className="text-stone-600">
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-semana-label" original="Semana N°:" tag="span" />
-                            </span> {getSemana(tropaSeleccionada.fechaRecepcion)}
-                          </div>
+                        <div className="flex items-center gap-4 flex-wrap text-sm text-stone-600">
+                          <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" /> {tropaSeleccionada.pesajeCamion?.transportista?.nombre || '-'}</span>
+                          <span>Chofer: {tropaSeleccionada.pesajeCamion?.choferNombre || '-'}</span>
+                          <span>Patente: {tropaSeleccionada.pesajeCamion?.patenteChasis || '-'}</span>
+                          <span>DTE: {tropaSeleccionada.dte || '-'}</span>
+                          <span>Guía: {tropaSeleccionada.guia || '-'}</span>
+                          <span>Corral: {tropaSeleccionada.corral?.nombre || '-'}</span>
+                          <span>Pesada N°: {tropaSeleccionada.pesajeCamion?.numeroTicket || '-'}</span>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="border rounded-lg p-4 bg-white space-y-2">
-                        <h4 className="font-semibold text-stone-700 flex items-center gap-2">
-                          <User className="w-4 h-4 text-amber-500" />
-                          <TextoEditable id="planilla01-productor-title" original="Usuario Faena" tag="span" />
-                        </h4>
-                        <div className="text-sm space-y-1">
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-nombre-label" original="Nombre:" tag="span" />
-                            </span> {tropaSeleccionada.usuarioFaena?.nombre || tropaSeleccionada.productor?.nombre || '-'}
-                          </p>
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-cuit-label" original="CUIT:" tag="span" />
-                            </span> {tropaSeleccionada.usuarioFaena?.cuit || tropaSeleccionada.productor?.cuit || '-'}
-                          </p>
+                      {/* Tabla de animales */}
+                      <div className="border rounded-lg overflow-hidden bg-white">
+                        <div className="bg-stone-100 px-3 py-2 border-b flex items-center justify-between">
+                          <h4 className="font-semibold text-stone-700 text-sm">
+                            <TextoEditable id="planilla01-detalle-animales" original="Detalle de Animales" tag="span" /> ({tropaSeleccionada.animales?.length || 0})
+                          </h4>
+                          <span className="text-xs text-stone-500">Cabezas: {tropaSeleccionada.cantidadCabezas} | Total: {kgNetosIndiv.toFixed(1)} kg | Prom: {pesoPromedio.toFixed(1)} kg</span>
                         </div>
-                      </div>
-                      <div className="border rounded-lg p-4 bg-white space-y-2">
-                        <h4 className="font-semibold text-stone-700 flex items-center gap-2">
-                          <User className="w-4 h-4 text-amber-500" />
-                          <TextoEditable id="planilla01-usuario-title" original="Productor / Titular" tag="span" />
-                        </h4>
-                        <div className="text-sm space-y-1">
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-nombre-label2" original="Nombre:" tag="span" />
-                            </span> {tropaSeleccionada.productor?.nombre || '-'}
-                          </p>
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-cuit-label2" original="CUIT:" tag="span" />
-                            </span> {tropaSeleccionada.productor?.cuit || '-'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="border rounded-lg p-4 bg-white space-y-2">
-                        <h4 className="font-semibold text-stone-700 flex items-center gap-2">
-                          <Truck className="w-4 h-4 text-amber-500" />
-                          <TextoEditable id="planilla01-transporte-title" original="Transporte" tag="span" />
-                        </h4>
-                        <div className="text-sm space-y-1">
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-transportista-label" original="Transportista:" tag="span" />
-                            </span> {tropaSeleccionada.pesajeCamion?.transportista?.nombre || '-'}
-                          </p>
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-chofer-label" original="Chofer:" tag="span" />
-                            </span> {tropaSeleccionada.pesajeCamion?.choferNombre || '-'}
-                          </p>
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-patente-label" original="Patente Chasis:" tag="span" />
-                            </span> {tropaSeleccionada.pesajeCamion?.patenteChasis || '-'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="border rounded-lg p-4 bg-white space-y-2">
-                        <h4 className="font-semibold text-stone-700 flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-amber-500" />
-                          <TextoEditable id="planilla01-documentos-title" original="Documentos" tag="span" />
-                        </h4>
-                        <div className="text-sm space-y-1">
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-nro-tropa-label" original="N° Tropa:" tag="span" />
-                            </span> {tropaSeleccionada.codigo}
-                          </p>
-                          <p>
-                            <span className="font-medium">DTE:</span> {tropaSeleccionada.dte || '-'}
-                          </p>
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-guia-label" original="Guía:" tag="span" />
-                            </span> {tropaSeleccionada.guia || '-'}
-                          </p>
-                          <p>
-                            <span className="font-medium">
-                              <TextoEditable id="planilla01-precintos-label" original="Precintos:" tag="span" />
-                            </span> {tropaSeleccionada.pesajeCamion?.precintos || '-'}
-                          </p>
+                        <div className="max-h-[350px] overflow-y-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-stone-50">
+                                <TableHead className="w-12 text-center text-xs">N°</TableHead>
+                                <TableHead className="text-center text-xs">Tipo</TableHead>
+                                <TableHead className="text-xs">Raza</TableHead>
+                                <TableHead className="text-xs">Caravana</TableHead>
+                                <TableHead className="text-right text-xs">Peso (kg)</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {tropaSeleccionada.animales?.map((animal, idx) => (
+                                <TableRow key={animal.id}>
+                                  <TableCell className="text-center font-medium text-xs">{animal.numero || idx + 1}</TableCell>
+                                  <TableCell className="text-center"><Badge variant="outline" className="text-xs">{TIPOS_ANIMAL_LABELS[animal.tipoAnimal] || animal.tipoAnimal}</Badge></TableCell>
+                                  <TableCell className="text-xs">{animal.raza || '-'}</TableCell>
+                                  <TableCell className="font-mono text-xs">{animal.caravana || '-'}</TableCell>
+                                  <TableCell className="text-right text-xs font-medium">
+                                    {animal.pesajeIndividual?.peso?.toFixed(1) || animal.pesoVivo?.toFixed(1) || '-'}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
                         </div>
                       </div>
                     </div>
-
-                    <div className="border rounded-lg overflow-hidden bg-white">
-                      <div className="bg-stone-100 px-4 py-2 border-b">
-                        <h4 className="font-semibold text-stone-700">
-                          <TextoEditable id="planilla01-detalle-animales" original="Detalle de Animales" tag="span" /> ({tropaSeleccionada.animales?.length || 0})
-                        </h4>
-                      </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-stone-50">
-                            <TableHead className="w-16 text-center">N°</TableHead>
-                            <TableHead className="text-center">
-                              <TextoEditable id="planilla01-th-tipo" original="Tipo" tag="span" />
-                            </TableHead>
-                            <TableHead>
-                              <TextoEditable id="planilla01-th-raza" original="Raza" tag="span" />
-                            </TableHead>
-                            <TableHead>
-                              <TextoEditable id="planilla01-th-caravana" original="Caravana" tag="span" />
-                            </TableHead>
-                            <TableHead className="text-right">
-                              <TextoEditable id="planilla01-th-peso" original="Peso (kg)" tag="span" />
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {tropaSeleccionada.animales?.slice(0, 20).map((animal, idx) => (
-                            <TableRow key={animal.id}>
-                              <TableCell className="text-center font-medium">{animal.numero || idx + 1}</TableCell>
-                              <TableCell className="text-center"><Badge variant="outline">{TIPOS_ANIMAL_LABELS[animal.tipoAnimal] || animal.tipoAnimal}</Badge></TableCell>
-                              <TableCell>{animal.raza || '-'}</TableCell>
-                              <TableCell className="font-mono text-sm">{animal.caravana || '-'}</TableCell>
-                              <TableCell className="text-right">{animal.pesoVivo?.toFixed(0) || '-'}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
+                  )
+                })()}
               </CardContent>
             </Card>
           </EditableBlock>
