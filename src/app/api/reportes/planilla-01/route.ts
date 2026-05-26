@@ -132,24 +132,42 @@ export async function GET(request: NextRequest) {
     const datosRow = 5
     doc.setFontSize(8)
 
-    // --- Columna izquierda: Productor ---
+    // --- Fila 1: Productor ---
     doc.setFont('helvetica', 'bold')
     doc.text('PRODUCTOR:', margin, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(tropa.productor?.nombre || tropa.usuarioFaena?.nombre || '-', margin + 20, y)
+    doc.text(tropa.productor?.nombre || '-', margin + 20, y)
+    doc.setFont('helvetica', 'bold')
+    doc.text('CUIT:', margin + 120, y)
+    doc.setFont('helvetica', 'normal')
+    doc.text(tropa.productor?.cuit || '-', margin + 132, y)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Tropa N\u00b0:', margin + 190, y)
+    doc.setFont('helvetica', 'normal')
+    doc.text(tropa.numero.toString(), margin + 210, y)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Cabezas:', margin + 240, y)
+    doc.setFont('helvetica', 'normal')
+    doc.text(String(tropa.cantidadCabezas), margin + 258, y)
     y += datosRow
+
+    // --- Fila 2: Usuario Faena ---
     doc.setFont('helvetica', 'bold')
-    doc.text('CUIT:', margin, y)
+    doc.text('USUARIO FAENA:', margin, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(tropa.productor?.cuit || tropa.usuarioFaena?.cuit || '-', margin + 20, y)
+    doc.text(tropa.usuarioFaena?.nombre || '-', margin + 28, y)
     doc.setFont('helvetica', 'bold')
-    doc.text('Tropa N°:', margin + 60, y)
+    doc.text('CUIT:', margin + 120, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(tropa.numero.toString(), margin + 75, y)
+    doc.text(tropa.usuarioFaena?.cuit || '-', margin + 132, y)
     doc.setFont('helvetica', 'bold')
-    doc.text('N° Reg.:', margin + 95, y)
+    doc.text('N\u00b0 Reg.:', margin + 190, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(tropa.numero.toString(), margin + 112, y)
+    doc.text(tropa.numero.toString(), margin + 210, y)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Corral:', margin + 240, y)
+    doc.setFont('helvetica', 'normal')
+    doc.text(tropa.corral?.nombre || '-', margin + 258, y)
     y += datosRow
 
     // --- Transporte ---
@@ -187,18 +205,14 @@ export async function GET(request: NextRequest) {
     doc.setFont('helvetica', 'normal')
     doc.text(tropa.guia || '-', margin + 12, y)
     doc.setFont('helvetica', 'bold')
-    doc.text('DTE:', margin + 55, y)
+    doc.text('DTE:', margin + 150, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(tropa.dte || '-', margin + 67, y)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Corral:', margin + 100, y)
-    doc.setFont('helvetica', 'normal')
-    doc.text(tropa.corral?.nombre || '-', margin + 115, y)
+    doc.text(tropa.dte || '-', margin + 165, y)
     // N° de pesada de camión (Ticket)
     doc.setFont('helvetica', 'bold')
-    doc.text('N° Pesada:', margin + 150, y)
+    doc.text('N° Pesada:', margin + 220, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(String(tropa.pesajeCamion?.numeroTicket || '-'), margin + 180, y)
+    doc.text(String(tropa.pesajeCamion?.numeroTicket || '-'), margin + 245, y)
     y += datosRow + 1
 
     // Línea separadora

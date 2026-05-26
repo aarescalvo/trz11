@@ -172,9 +172,9 @@ export async function POST(request: NextRequest) {
     prodRow.height = 18
     const prodData = [
       { v: 'Productor:', c: 1, w: 2, bold: true },
-      { v: tropa.productor?.nombre || tropa.usuarioFaena?.nombre || '-', c: 3, w: 4 },
+      { v: tropa.productor?.nombre || '-', c: 3, w: 4 },
       { v: 'CUIT:', c: 7, w: 1, bold: true },
-      { v: tropa.productor?.cuit || tropa.usuarioFaena?.cuit || '-', c: 8, w: 2 },
+      { v: tropa.productor?.cuit || '-', c: 8, w: 2 },
       { v: 'Tropa N°:', c: 10, w: 1, bold: true },
       { v: tropa.numero?.toString() || tropa.codigo || '-', c: 11, w: 1 },
       { v: 'Cabezas:', c: 12, w: 1, bold: true },
@@ -191,10 +191,36 @@ export async function POST(request: NextRequest) {
         alignment: { vertical: 'middle', indent: d.bold ? 1 : 0 }
       })
     })
+    r += 1
+
+    // Fila usuario faena datos
+    const ufRow = ws.getRow(r)
+    ufRow.height = 18
+    const ufData = [
+      { v: 'Usuario Faena:', c: 1, w: 2, bold: true },
+      { v: tropa.usuarioFaena?.nombre || '-', c: 3, w: 4 },
+      { v: 'CUIT:', c: 7, w: 1, bold: true },
+      { v: tropa.usuarioFaena?.cuit || '-', c: 8, w: 2 },
+      { v: 'N\u00b0 Reg.:', c: 10, w: 1, bold: true },
+      { v: tropa.numero?.toString() || tropa.codigo || '-', c: 11, w: 1 },
+      { v: 'Corral:', c: 12, w: 1, bold: true },
+      { v: tropa.corral?.nombre || '-', c: 13, w: 1 },
+    ]
+    ufData.forEach(d => {
+      if (d.w > 1) ws.mergeCells(r, d.c, r, d.c + d.w - 1)
+      const cell = ufRow.getCell(d.c)
+      cell.value = d.v
+      applyCell(cell, {
+        font: { size: 9, bold: !!d.bold, color: { argb: 'FF333333' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } },
+        border: thinBorder,
+        alignment: { vertical: 'middle', indent: d.bold ? 1 : 0 }
+      })
+    })
     r += 2
 
     // ============================================================
-    //  SECCIÓN: DATOS DEL TRANSPORTE
+    //  SECCION: DATOS DEL TRANSPORTE
     // ============================================================
     ws.mergeCells(r, 1, r, 13)
     const secTransp = ws.getRow(r).getCell(1)
