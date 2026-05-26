@@ -54,13 +54,10 @@ export async function GET(request: NextRequest) {
     const config = await db.configuracionFrigorifico.findFirst()
 
     // ===== CÁLCULOS DE PESAJE =====
-    // Kg netos del camión (peso bruto - peso tara)
     const kgNetosCamion = tropa.pesajeCamion?.pesoNeto ?? null
-    // Kg netos sumatoria de pesaje individual por animal
     const kgNetosIndividuales = tropa.animales.reduce((acc, a) => {
       return acc + (a.pesajeIndividual?.peso || a.pesoVivo || 0)
     }, 0)
-    // Diferencia (Camión - Individual): positivo = sobra, negativo = falta
     const diferenciaKg = kgNetosCamion !== null ? kgNetosCamion - kgNetosIndividuales : null
 
     // Crear PDF A4 Horizontal
@@ -82,7 +79,7 @@ export async function GET(request: NextRequest) {
 
     // Tropa N° GRANDE a la derecha del título
     doc.setFontSize(20)
-    doc.text(`TROPA N° ${tropa.numero}`, pageWidth - margin, y, { align: 'right' })
+    doc.text(`TROPA N\u00b0 ${tropa.numero}`, pageWidth - margin, y, { align: 'right' })
     y += 5
 
     doc.setFontSize(9)
@@ -90,7 +87,7 @@ export async function GET(request: NextRequest) {
     doc.text('REGISTRO DE INGRESO DE HACIENDA', pageWidth / 2, y, { align: 'center' })
     y += 6
 
-    // ===== DATOS DEL ESTABLECIMIENTO (fila horizontal) =====
+    // ===== DATOS DEL ESTABLECIMIENTO =====
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.text('ESTABLECIMIENTO:', margin, y)
@@ -128,7 +125,7 @@ export async function GET(request: NextRequest) {
     doc.line(margin, y, pageWidth - margin, y)
     y += 4
 
-    // ===== FILA DE DATOS (Productor, Transporte, Documentos) =====
+    // ===== FILA DE DATOS =====
     const datosRow = 5
     doc.setFontSize(8)
 
@@ -201,7 +198,7 @@ export async function GET(request: NextRequest) {
 
     // --- Documentación ---
     doc.setFont('helvetica', 'bold')
-    doc.text('Guía:', margin, y)
+    doc.text('Gu\u00eda:', margin, y)
     doc.setFont('helvetica', 'normal')
     doc.text(tropa.guia || '-', margin + 12, y)
     doc.setFont('helvetica', 'bold')
@@ -210,7 +207,7 @@ export async function GET(request: NextRequest) {
     doc.text(tropa.dte || '-', margin + 165, y)
     // N° de pesada de camión (Ticket)
     doc.setFont('helvetica', 'bold')
-    doc.text('N° Pesada:', margin + 220, y)
+    doc.text('N\u00b0 Pesada:', margin + 220, y)
     doc.setFont('helvetica', 'normal')
     doc.text(String(tropa.pesajeCamion?.numeroTicket || '-'), margin + 245, y)
     y += datosRow + 1
@@ -246,19 +243,17 @@ export async function GET(request: NextRequest) {
 
     // Headers
     const headers = [
-      'Nº',
+      'N\u00ba',
       'Tipo',
       'Sexo',
       'Peso Entrada (kg)',
       'Caravana',
-      'Tipificación',
+      'Tipificaci\u00f3n',
       'Corral'
     ]
 
-    // Calcular filas por página (espacio disponible ~95mm para la tabla)
-    const startY = y
     autoTable(doc, {
-      startY: startY,
+      startY: y,
       head: [headers],
       body: tableData,
       theme: 'grid',
@@ -283,11 +278,10 @@ export async function GET(request: NextRequest) {
       },
       margin: { left: margin, right: margin },
       didDrawPage: (data) => {
-        // Encabezado en cada página (excepto la primera que ya lo tiene)
         if (data.pageNumber > 1) {
           doc.setFontSize(8)
           doc.setFont('helvetica', 'bold')
-          doc.text(`PLANILLA 01 - BOVINO | Tropa N° ${tropa.numero}`, pageWidth / 2, 8, { align: 'center' })
+          doc.text(`PLANILLA 01 - BOVINO | Tropa N\u00b0 ${tropa.numero}`, pageWidth / 2, 8, { align: 'center' })
         }
       }
     })
@@ -304,87 +298,71 @@ export async function GET(request: NextRequest) {
 
     y += 5
 
-    // ===== 3 CUADROS COMPARATIVOS (más chicos, debajo de la tabla) =====
+    // ===== 4 CUADROS COMPARATIVOS (debajo de la tabla) =====
     doc.setDrawColor(0)
     doc.setLineWidth(0.3)
     doc.line(margin, y, pageWidth - margin, y)
     y += 2
 
     const boxW = 55
-    const boxH = 12
+    const boxH = 14
     const boxGap = 15
     const boxStartX = margin
 
     // Cuadro 1: Kg Netos Camión
-    doc.setDrawColor(0, 0, 150)
-    doc.setFillColor(235, 240, 255)
+    doc.setDrawColor(120)
+    doc.setFillColor(240, 240, 240)
     doc.roundedRect(boxStartX, y, boxW, boxH, 1.5, 1.5, 'FD')
-    doc.setFontSize(6)
+    doc.setFontSize(7)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(0, 0, 150)
-    doc.text('NETO CAMIÓN', boxStartX + 3, y + 4)
-    doc.setFontSize(9)
+    doc.setTextColor(80)
+    doc.text('KG NETOS CAMIÓN', boxStartX + 3, y + 4)
+    doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(kgNetosCamion !== null ? kgNetosCamion.toFixed(1) + ' kg' : 'S/D', boxStartX + 3, y + 10)
-    doc.setTextColor(0, 0, 0)
+    doc.text(kgNetosCamion !== null ? kgNetosCamion.toFixed(1) + ' kg' : 'S/D', boxStartX + 3, y + 11)
+    doc.setTextColor(0)
 
     // Cuadro 2: Kg Netos Individuales
     const box2X = boxStartX + boxW + boxGap
-    doc.setDrawColor(0, 100, 0)
-    doc.setFillColor(235, 250, 235)
+    doc.setDrawColor(120)
+    doc.setFillColor(240, 240, 240)
     doc.roundedRect(box2X, y, boxW, boxH, 1.5, 1.5, 'FD')
-    doc.setFontSize(6)
+    doc.setFontSize(7)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(0, 100, 0)
-    doc.text('NETO INDIVIDUALES', box2X + 3, y + 4)
-    doc.setFontSize(9)
+    doc.setTextColor(80)
+    doc.text('KG NETOS INDIVIDUALES', box2X + 3, y + 4)
+    doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(kgNetosIndividuales.toFixed(1) + ' kg', box2X + 3, y + 10)
-    doc.setTextColor(0, 0, 0)
+    doc.text(kgNetosIndividuales.toFixed(1) + ' kg', box2X + 3, y + 11)
+    doc.setTextColor(0)
 
     // Cuadro 3: Diferencia
     const box3X = box2X + boxW + boxGap
-    if (diferenciaKg !== null) {
-      const esPositivo = diferenciaKg >= 0
-      const diffR = esPositivo ? 180 : 220
-      doc.setDrawColor(diffR, 0, 0)
-      doc.setFillColor(esPositivo ? 255 : 255, esPositivo ? 250 : 235, esPositivo ? 230 : 235)
-      doc.roundedRect(box3X, y, boxW, boxH, 1.5, 1.5, 'FD')
-      doc.setFontSize(6)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(diffR, 0, 0)
-      doc.text('DIFERENCIA (Camión - Indiv.)', box3X + 3, y + 4)
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      doc.text((esPositivo ? '+' : '') + diferenciaKg.toFixed(1) + ' kg', box3X + 3, y + 10)
-      doc.setTextColor(0, 0, 0)
-    } else {
-      doc.setDrawColor(150)
-      doc.setFillColor(245, 245, 245)
-      doc.roundedRect(box3X, y, boxW, boxH, 1.5, 1.5, 'FD')
-      doc.setFontSize(6)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(150)
-      doc.text('DIFERENCIA', box3X + 3, y + 4)
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      doc.text('Sin pesada camión', box3X + 3, y + 10)
-      doc.setTextColor(0, 0, 0)
-    }
-
-    // Cuadro 4: Promedio Kg Netos (más chico)
-    const box4X = box3X + boxW + boxGap
-    doc.setDrawColor(100, 100, 0)
-    doc.setFillColor(255, 252, 235)
-    doc.roundedRect(box4X, y, 45, boxH, 1.5, 1.5, 'FD')
-    doc.setFontSize(6)
+    doc.setDrawColor(120)
+    doc.setFillColor(240, 240, 240)
+    doc.roundedRect(box3X, y, boxW, boxH, 1.5, 1.5, 'FD')
+    doc.setFontSize(7)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(100, 100, 0)
-    doc.text('PROMEDIO KG NETOS', box4X + 3, y + 4)
-    doc.setFontSize(9)
+    doc.setTextColor(80)
+    doc.text('DIFERENCIA (Camión - Indiv.)', box3X + 3, y + 4)
+    doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(pesoPromedio.toFixed(1) + ' kg', box4X + 3, y + 10)
-    doc.setTextColor(0, 0, 0)
+    doc.text(diferenciaKg !== null ? ((diferenciaKg >= 0 ? '+' : '') + diferenciaKg.toFixed(1) + ' kg') : 'Sin pesada camión', box3X + 3, y + 11)
+    doc.setTextColor(0)
+
+    // Cuadro 4: Promedio Kg Netos
+    const box4X = box3X + boxW + boxGap
+    doc.setDrawColor(120)
+    doc.setFillColor(240, 240, 240)
+    doc.roundedRect(box4X, y, 45, boxH, 1.5, 1.5, 'FD')
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(80)
+    doc.text('PROMEDIO KG NETOS', box4X + 3, y + 4)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(pesoPromedio.toFixed(1) + ' kg', box4X + 3, y + 11)
+    doc.setTextColor(0)
 
     y += boxH + 4
     doc.setDrawColor(0)
@@ -425,7 +403,7 @@ export async function GET(request: NextRequest) {
       doc.setFontSize(7)
       doc.setFont('helvetica', 'normal')
       doc.text(
-        `Página ${i} de ${pageCount}`,
+        `P\u00e1gina ${i} de ${pageCount}`,
         pageWidth / 2,
         pageHeight - 5,
         { align: 'center' }

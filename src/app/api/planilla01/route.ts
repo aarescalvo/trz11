@@ -17,18 +17,6 @@ const thinBorder: Partial<ExcelJS.Borders> = {
   right: { style: 'thin', color: { argb: 'FF999999' } }
 }
 
-const noBorder: Partial<ExcelJS.Borders> = {
-  top: { style: 'none' }, bottom: { style: 'none' },
-  left: { style: 'none' }, right: { style: 'none' }
-}
-
-const headerBorder: Partial<ExcelJS.Borders> = {
-  top: { style: 'medium', color: { argb: 'FF333333' } },
-  bottom: { style: 'medium', color: { argb: 'FF333333' } },
-  left: { style: 'thin', color: { argb: 'FF999999' } },
-  right: { style: 'thin', color: { argb: 'FF999999' } }
-}
-
 function applyCell(cell: ExcelJS.Cell, opts: {
   font?: Partial<ExcelJS.Font>
   fill?: Partial<ExcelJS.Fill>
@@ -49,6 +37,27 @@ function applyCell(cell: ExcelJS.Cell, opts: {
     cell.alignment = Object.assign(cell.alignment || {}, opts.alignment)
   }
   if (opts.numFmt) cell.numFmt = opts.numFmt
+}
+
+// Helper para escribir una fila de datos con labels
+function writeDataRow(ws: ExcelJS.Worksheet, r: number, data: Array<{ v: string | number | null; c: number; w: number; bold?: boolean; align?: string }>) {
+  const row = ws.getRow(r)
+  row.height = 18
+  data.forEach(d => {
+    if (d.w > 1) ws.mergeCells(r, d.c, r, d.c + d.w - 1)
+    const cell = row.getCell(d.c)
+    cell.value = d.v
+    applyCell(cell, {
+      font: { size: 9, bold: !!d.bold, color: { argb: 'FF333333' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } },
+      border: thinBorder,
+      alignment: {
+        vertical: 'middle',
+        horizontal: d.align as 'left' | 'center' | 'right' || (d.bold ? 'left' : 'left'),
+        indent: d.bold ? 1 : 0
+      }
+    })
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -131,14 +140,13 @@ export async function POST(request: NextRequest) {
     titleCell.value = 'PLANILLA 01 - REGISTRO DE INGRESO DE HACIENDA'
     applyCell(titleCell, {
       font: { bold: true, size: 16, color: { argb: 'FF000000' } },
-      alignment: { horizontal: 'center', vertical: 'middle' },
-      border: noBorder
+      alignment: { horizontal: 'center', vertical: 'middle' }
     })
     ws.getRow(r).height = 30
     r += 1
 
     // ============================================================
-    //  FILA 2: ESTABLECIMIENTO + DATOS (borde gris de sección)
+    //  FILA 2: ESTABLECIMIENTO + DATOS
     // ============================================================
     ws.mergeCells(r, 1, r, 13)
     const estCell = ws.getRow(r).getCell(1)
@@ -146,7 +154,7 @@ export async function POST(request: NextRequest) {
     applyCell(estCell, {
       font: { bold: true, size: 9, color: { argb: 'FF333333' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } },
-      border: { ...thinBorder, bottom: { style: 'medium', color: { argb: 'FF333333' } } },
+      border: thinBorder,
       alignment: { horizontal: 'left', vertical: 'middle', indent: 1 }
     })
     ws.getRow(r).height = 20
@@ -161,16 +169,13 @@ export async function POST(request: NextRequest) {
     applyCell(secProd, {
       font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A4A4A' } },
-      border: noBorder,
       alignment: { vertical: 'middle', indent: 1 }
     })
     ws.getRow(r).height = 20
     r += 1
 
-    // Fila productor datos
-    const prodRow = ws.getRow(r)
-    prodRow.height = 18
-    const prodData = [
+    // Fila productor
+    writeDataRow(ws, r, [
       { v: 'Productor:', c: 1, w: 2, bold: true },
       { v: tropa.productor?.nombre || '-', c: 3, w: 4 },
       { v: 'CUIT:', c: 7, w: 1, bold: true },
@@ -179,48 +184,24 @@ export async function POST(request: NextRequest) {
       { v: tropa.numero?.toString() || tropa.codigo || '-', c: 11, w: 1 },
       { v: 'Cabezas:', c: 12, w: 1, bold: true },
       { v: String(tropa.cantidadCabezas), c: 13, w: 1 },
-    ]
-    prodData.forEach(d => {
-      if (d.w > 1) ws.mergeCells(r, d.c, r, d.c + d.w - 1)
-      const cell = prodRow.getCell(d.c)
-      cell.value = d.v
-      applyCell(cell, {
-        font: { size: 9, bold: !!d.bold, color: { argb: 'FF333333' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } },
-        border: thinBorder,
-        alignment: { vertical: 'middle', indent: d.bold ? 1 : 0 }
-      })
-    })
+    ])
     r += 1
 
-    // Fila usuario faena datos
-    const ufRow = ws.getRow(r)
-    ufRow.height = 18
-    const ufData = [
+    // Fila usuario faena
+    writeDataRow(ws, r, [
       { v: 'Usuario Faena:', c: 1, w: 2, bold: true },
       { v: tropa.usuarioFaena?.nombre || '-', c: 3, w: 4 },
       { v: 'CUIT:', c: 7, w: 1, bold: true },
       { v: tropa.usuarioFaena?.cuit || '-', c: 8, w: 2 },
-      { v: 'N\u00b0 Reg.:', c: 10, w: 1, bold: true },
+      { v: 'N° Reg.:', c: 10, w: 1, bold: true },
       { v: tropa.numero?.toString() || tropa.codigo || '-', c: 11, w: 1 },
       { v: 'Corral:', c: 12, w: 1, bold: true },
       { v: tropa.corral?.nombre || '-', c: 13, w: 1 },
-    ]
-    ufData.forEach(d => {
-      if (d.w > 1) ws.mergeCells(r, d.c, r, d.c + d.w - 1)
-      const cell = ufRow.getCell(d.c)
-      cell.value = d.v
-      applyCell(cell, {
-        font: { size: 9, bold: !!d.bold, color: { argb: 'FF333333' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } },
-        border: thinBorder,
-        alignment: { vertical: 'middle', indent: d.bold ? 1 : 0 }
-      })
-    })
+    ])
     r += 2
 
     // ============================================================
-    //  SECCION: DATOS DEL TRANSPORTE
+    //  SECCIÓN: DATOS DEL TRANSPORTE
     // ============================================================
     ws.mergeCells(r, 1, r, 13)
     const secTransp = ws.getRow(r).getCell(1)
@@ -228,58 +209,31 @@ export async function POST(request: NextRequest) {
     applyCell(secTransp, {
       font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A4A4A' } },
-      border: noBorder,
       alignment: { vertical: 'middle', indent: 1 }
     })
     ws.getRow(r).height = 20
     r += 1
 
     // Fila transportista
-    const transRow1 = ws.getRow(r)
-    transRow1.height = 18
-    const transData1 = [
+    writeDataRow(ws, r, [
       { v: 'Transportista:', c: 1, w: 2, bold: true },
       { v: tropa.pesajeCamion?.transportista?.nombre || '-', c: 3, w: 3 },
       { v: 'Chofer:', c: 7, w: 1, bold: true },
       { v: tropa.pesajeCamion?.choferNombre || '-', c: 8, w: 2 },
       { v: 'DNI:', c: 10, w: 1, bold: true },
       { v: tropa.pesajeCamion?.choferDni || '-', c: 11, w: 2 },
-    ]
-    transData1.forEach(d => {
-      if (d.w > 1) ws.mergeCells(r, d.c, r, d.c + d.w - 1)
-      const cell = transRow1.getCell(d.c)
-      cell.value = d.v
-      applyCell(cell, {
-        font: { size: 9, bold: !!d.bold, color: { argb: 'FF333333' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } },
-        border: thinBorder,
-        alignment: { vertical: 'middle', indent: d.bold ? 1 : 0 }
-      })
-    })
+    ])
     r += 1
 
     // Fila patentes
-    const transRow2 = ws.getRow(r)
-    transRow2.height = 18
-    const transData2 = [
+    writeDataRow(ws, r, [
       { v: 'Patente Chasis:', c: 1, w: 2, bold: true },
       { v: tropa.pesajeCamion?.patenteChasis || '-', c: 3, w: 2 },
       { v: 'Acoplado:', c: 6, w: 1, bold: true },
       { v: tropa.pesajeCamion?.patenteAcoplado || '-', c: 7, w: 2 },
       { v: 'Precintos:', c: 9, w: 2, bold: true },
       { v: tropa.pesajeCamion?.precintos || '-', c: 11, w: 2 },
-    ]
-    transData2.forEach(d => {
-      if (d.w > 1) ws.mergeCells(r, d.c, r, d.c + d.w - 1)
-      const cell = transRow2.getCell(d.c)
-      cell.value = d.v
-      applyCell(cell, {
-        font: { size: 9, bold: !!d.bold, color: { argb: 'FF333333' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } },
-        border: thinBorder,
-        alignment: { vertical: 'middle', indent: d.bold ? 1 : 0 }
-      })
-    })
+    ])
     r += 2
 
     // ============================================================
@@ -291,33 +245,19 @@ export async function POST(request: NextRequest) {
     applyCell(secDoc, {
       font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A4A4A' } },
-      border: noBorder,
       alignment: { vertical: 'middle', indent: 1 }
     })
     ws.getRow(r).height = 20
     r += 1
 
-    const docRow = ws.getRow(r)
-    docRow.height = 18
-    const docData = [
-      { v: 'DTE:', c: 1, w: 1, bold: true },
-      { v: tropa.dte || '-', c: 2, w: 3 },
-      { v: 'Guía:', c: 6, w: 1, bold: true },
-      { v: tropa.guia || '-', c: 7, w: 2 },
-      { v: 'Corral:', c: 10, w: 1, bold: true },
-      { v: tropa.corral?.nombre || '-', c: 11, w: 2 },
-    ]
-    docData.forEach(d => {
-      if (d.w > 1) ws.mergeCells(r, d.c, r, d.c + d.w - 1)
-      const cell = docRow.getCell(d.c)
-      cell.value = d.v
-      applyCell(cell, {
-        font: { size: 9, bold: !!d.bold, color: { argb: 'FF333333' } },
-        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } },
-        border: thinBorder,
-        alignment: { vertical: 'middle', indent: d.bold ? 1 : 0 }
-      })
-    })
+    writeDataRow(ws, r, [
+      { v: 'Guía:', c: 1, w: 1, bold: true },
+      { v: tropa.guia || '-', c: 2, w: 3 },
+      { v: 'DTE:', c: 6, w: 1, bold: true },
+      { v: tropa.dte || '-', c: 7, w: 2 },
+      { v: 'N° Pesada:', c: 10, w: 1, bold: true },
+      { v: String(tropa.pesajeCamion?.numeroTicket || '-'), c: 11, w: 2 },
+    ])
     r += 2
 
     // ============================================================
@@ -329,7 +269,6 @@ export async function POST(request: NextRequest) {
     applyCell(secAnim, {
       font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A4A4A' } },
-      border: noBorder,
       alignment: { vertical: 'middle', indent: 1 }
     })
     ws.getRow(r).height = 20
@@ -353,7 +292,7 @@ export async function POST(request: NextRequest) {
       applyCell(cell, {
         font: { bold: true, size: 9, color: { argb: 'FFFFFFFF' } },
         fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A4A4A' } },
-        border: headerBorder,
+        border: thinBorder,
         alignment: { horizontal: 'center', vertical: 'middle' }
       })
     })
@@ -398,13 +337,13 @@ export async function POST(request: NextRequest) {
     // ============================================================
     const totalARow = ws.getRow(r)
     totalARow.height = 18
-    ws.mergeCells(r, 1, r, 4)
+    ws.mergeCells(r, 1, r, 7)
     const totalLabel = totalARow.getCell(1)
     totalLabel.value = `TOTALES:  Cabezas: ${totalAnimales}  |  Suma Pesos Indiv.: ${kgNetosIndividuales.toFixed(1)} kg  |  Peso Promedio: ${pesoPromedio.toFixed(1)} kg`
     applyCell(totalLabel, {
       font: { bold: true, size: 9, color: { argb: 'FF000000' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } },
-      border: { ...thinBorder, top: { style: 'medium', color: { argb: 'FF333333' } } },
+      border: thinBorder,
       alignment: { vertical: 'middle', indent: 1 }
     })
     r += 2
@@ -418,123 +357,67 @@ export async function POST(request: NextRequest) {
     applyCell(secPesaje, {
       font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A4A4A' } },
-      border: noBorder,
       alignment: { vertical: 'middle', indent: 1 }
     })
     ws.getRow(r).height = 20
     r += 1
 
     // N° Pesada camión
-    const pesadaR = ws.getRow(r)
-    pesadaR.height = 18
-    const pesadaCell = pesadaR.getCell(1)
-    ws.mergeCells(r, 1, r, 3)
-    pesadaCell.value = 'N° PESADA CAMIÓN:'
-    applyCell(pesadaCell, {
-      font: { bold: true, size: 9, color: { argb: 'FF333333' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } },
-      border: thinBorder,
-      alignment: { vertical: 'middle', indent: 1 }
-    })
-    const pesadaVal = pesadaR.getCell(4)
-    pesadaVal.value = String(tropa.pesajeCamion?.numeroTicket || '-')
-    applyCell(pesadaVal, {
-      font: { bold: true, size: 11, color: { argb: 'FF333333' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } },
-      border: thinBorder,
-      alignment: { vertical: 'middle' }
+    writeDataRow(ws, r, [
+      { v: 'N° PESADA CAMIÓN:', c: 1, w: 3, bold: true },
+      { v: String(tropa.pesajeCamion?.numeroTicket || '-'), c: 4, w: 2 },
+    ])
+    r += 1
+
+    // ============================================================
+    //  4 CUADROS COMPARATIVOS - 2 FILAS (encabezado + valor)
+    // ============================================================
+
+    // --- FILA DE ENCABEZADOS ---
+    const boxHeaders = [
+      { v: 'KG NETOS CAMIÓN', c: 1, w: 3 },
+      { v: 'KG NETOS INDIVIDUALES', c: 4, w: 3 },
+      { v: 'DIFERENCIA (kg)', c: 7, w: 3 },
+      { v: 'PROMEDIO KG NETOS', c: 10, w: 3 },
+    ]
+
+    const headerRow = ws.getRow(r)
+    headerRow.height = 16
+    boxHeaders.forEach(bh => {
+      ws.mergeCells(r, bh.c, r, bh.c + bh.w - 1)
+      const cell = headerRow.getCell(bh.c)
+      cell.value = bh.v
+      applyCell(cell, {
+        font: { bold: true, size: 8, color: { argb: 'FF333333' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } },
+        border: { top: { style: 'medium', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'thin', color: { argb: 'FF555555' } } },
+        alignment: { horizontal: 'center', vertical: 'middle' }
+      })
     })
     r += 1
 
-    // --- 4 CUADROS COMPARATIVOS en una fila ---
-    const boxRow = r
-    ws.getRow(boxRow).height = 38
-    r += 1
+    // --- FILA DE VALORES ---
+    const boxVals = [
+      { v: kgNetosCamion !== null ? kgNetosCamion : 'Sin datos', c: 1, w: 3, fmt: '#,##0.0', bg: 'FFF2F2F2' },
+      { v: kgNetosIndividuales, c: 4, w: 3, fmt: '#,##0.0', bg: 'FFF2F2F2' },
+      { v: diferenciaKg !== null ? ((diferenciaKg >= 0 ? '+' : '') + diferenciaKg.toFixed(1) + ' kg') : 'Sin datos', c: 7, w: 3, fmt: undefined, bg: 'FFF2F2F2' },
+      { v: pesoPromedio, c: 10, w: 3, fmt: '#,##0.0', bg: 'FFF2F2F2' },
+    ]
 
-    // Cuadro 1: NETO CAMIÓN (azul)
-    ws.mergeCells(boxRow, 1, boxRow + 1, 3)
-    const box1Title = ws.getRow(boxRow).getCell(1)
-    box1Title.value = 'KG NETOS CAMIÓN'
-    applyCell(box1Title, {
-      font: { bold: true, size: 8, color: { argb: 'FF333333' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } },
-      border: { top: { style: 'medium', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'thin', color: { argb: 'FF555555' } } },
-      alignment: { horizontal: 'center', vertical: 'middle' }
+    const valRow = ws.getRow(r)
+    valRow.height = 24
+    boxVals.forEach(bv => {
+      ws.mergeCells(r, bv.c, r, bv.c + bv.w - 1)
+      const cell = valRow.getCell(bv.c)
+      cell.value = bv.v
+      applyCell(cell, {
+        font: { bold: true, size: 14, color: { argb: 'FF333333' } },
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: bv.bg } },
+        border: { top: { style: 'thin', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'medium', color: { argb: 'FF555555' } } },
+        alignment: { horizontal: 'center', vertical: 'middle' },
+        numFmt: bv.fmt
+      })
     })
-    const box1Val = ws.getRow(boxRow + 1).getCell(1)
-    box1Val.value = kgNetosCamion !== null ? kgNetosCamion : 'Sin datos'
-    applyCell(box1Val, {
-      font: { bold: true, size: 14, color: { argb: 'FF333333' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } },
-      border: { top: { style: 'thin', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'medium', color: { argb: 'FF555555' } } },
-      alignment: { horizontal: 'center', vertical: 'middle' }
-    })
-    if (kgNetosCamion !== null) box1Val.numFmt = '#,##0.0'
-
-    // Cuadro 2: NETO INDIVIDUALES (verde)
-    ws.mergeCells(boxRow, 4, boxRow + 1, 6)
-    const box2Title = ws.getRow(boxRow).getCell(4)
-    box2Title.value = 'KG NETOS INDIVIDUALES'
-    applyCell(box2Title, {
-      font: { bold: true, size: 8, color: { argb: 'FF333333' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } },
-      border: { top: { style: 'medium', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'thin', color: { argb: 'FF555555' } } },
-      alignment: { horizontal: 'center', vertical: 'middle' }
-    })
-    const box2Val = ws.getRow(boxRow + 1).getCell(4)
-    box2Val.value = kgNetosIndividuales
-    applyCell(box2Val, {
-      font: { bold: true, size: 14, color: { argb: 'FF333333' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } },
-      border: { top: { style: 'thin', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'medium', color: { argb: 'FF555555' } } },
-      alignment: { horizontal: 'center', vertical: 'middle' }
-    })
-    box2Val.numFmt = '#,##0.0'
-
-    // Cuadro 3: DIFERENCIA (rojo/amarillo)
-    ws.mergeCells(boxRow, 7, boxRow + 1, 9)
-    const box3Title = ws.getRow(boxRow).getCell(7)
-    box3Title.value = 'DIFERENCIA'
-    const diffColor = 'FF333333'
-    const diffBg = 'FFF2F2F2'
-    applyCell(box3Title, {
-      font: { bold: true, size: 8, color: { argb: diffColor } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: diffBg } },
-      border: { top: { style: 'medium', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'thin', color: { argb: 'FF555555' } } },
-      alignment: { horizontal: 'center', vertical: 'middle' }
-    })
-    const box3Val = ws.getRow(boxRow + 1).getCell(7)
-    box3Val.value = diferenciaKg !== null
-      ? ((diferenciaKg >= 0 ? '+' : '') + diferenciaKg.toFixed(1) + ' kg')
-      : 'Sin datos camión'
-    applyCell(box3Val, {
-      font: { bold: true, size: 14, color: { argb: diffColor } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: diffBg } },
-      border: { top: { style: 'thin', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'medium', color: { argb: 'FF555555' } } },
-      alignment: { horizontal: 'center', vertical: 'middle' }
-    })
-
-    // Cuadro 4: PROMEDIO KG (dorado)
-    ws.mergeCells(boxRow, 10, boxRow + 1, 12)
-    const box4Title = ws.getRow(boxRow).getCell(10)
-    box4Title.value = 'PROMEDIO KG NETOS'
-    applyCell(box4Title, {
-      font: { bold: true, size: 8, color: { argb: 'FF333333' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F7F7' } },
-      border: { top: { style: 'medium', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'thin', color: { argb: 'FF555555' } } },
-      alignment: { horizontal: 'center', vertical: 'middle' }
-    })
-    const box4Val = ws.getRow(boxRow + 1).getCell(10)
-    box4Val.value = pesoPromedio
-    applyCell(box4Val, {
-      font: { bold: true, size: 14, color: { argb: 'FF333333' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7F7F7' } },
-      border: { top: { style: 'thin', color: { argb: 'FF555555' } }, left: { style: 'medium', color: { argb: 'FF555555' } }, right: { style: 'medium', color: { argb: 'FF555555' } }, bottom: { style: 'medium', color: { argb: 'FF555555' } } },
-      alignment: { horizontal: 'center', vertical: 'middle' }
-    })
-    box4Val.numFmt = '#,##0.0'
-
-    // Separador
     r += 2
 
     // ============================================================
@@ -579,7 +462,6 @@ export async function POST(request: NextRequest) {
     applyCell(secObs, {
       font: { bold: true, size: 9, color: { argb: 'FFFFFFFF' } },
       fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4A4A4A' } },
-      border: noBorder,
       alignment: { vertical: 'middle', indent: 1 }
     })
     ws.getRow(r).height = 18
@@ -612,7 +494,7 @@ export async function POST(request: NextRequest) {
       cell.value = f.label
       applyCell(cell, {
         font: { bold: true, size: 8, color: { argb: 'FF999999' } },
-        border: { top: { style: 'none' }, bottom: { style: 'thin', color: { argb: 'FF999999' } }, left: { style: 'none' }, right: { style: 'none' } },
+        border: { top: { style: 'thin', color: { argb: 'FFCCCCCC' } }, bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }, left: { style: 'thin', color: { argb: 'FFCCCCCC' } }, right: { style: 'thin', color: { argb: 'FFCCCCCC' } } },
         alignment: { horizontal: 'center', vertical: 'bottom' }
       })
     })

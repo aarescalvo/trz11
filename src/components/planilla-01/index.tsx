@@ -9,9 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import {
+import { 
   FileText, Download, Search, Loader2, Truck, User, Building2,
-  Eye, FileSpreadsheet, FileDown, Scale, ArrowLeftRight, TrendingUp, TrendingDown
+  Eye, FileSpreadsheet, FileDown
 } from 'lucide-react'
 import { TextoEditable, EditableBlock, useEditor } from '@/components/ui/editable-screen'
 
@@ -26,7 +26,6 @@ interface Tropa {
   dte: string
   guia: string
   fechaRecepcion: string
-  observaciones?: string
   corral?: { nombre: string }
   productor?: { nombre: string; cuit: string }
   usuarioFaena: { nombre: string; cuit: string }
@@ -37,19 +36,14 @@ interface Tropa {
     choferDni?: string
     transportista?: { nombre: string; cuit: string }
     precintos?: string
-    pesoBruto?: number | null
-    pesoTara?: number | null
-    pesoNeto?: number | null
-    numeroTicket?: number
   }
   animales: Array<{
     id: string
     numero: number
     tipoAnimal: string
     caravana?: string
-    pesoVivo?: number | null
+    pesoVivo?: number
     raza?: string
-    pesajeIndividual?: { peso: number; fecha: string } | null
   }>
 }
 
@@ -124,25 +118,6 @@ export function Planilla01Module({ operador }: Props) {
     }
   }
 
-  // ===== CÁLCULOS DE PESAJE =====
-  const getKgNetosCamion = (): number | null => {
-    return tropaSeleccionada?.pesajeCamion?.pesoNeto ?? null
-  }
-
-  const getKgNetosIndividuales = (): number => {
-    if (!tropaSeleccionada?.animales) return 0
-    return tropaSeleccionada.animales.reduce((sum, a) => {
-      return sum + (a.pesajeIndividual?.peso || a.pesoVivo || 0)
-    }, 0)
-  }
-
-  const getDiferencia = (): number | null => {
-    const camion = getKgNetosCamion()
-    const indiv = getKgNetosIndividuales()
-    if (camion === null) return null
-    return camion - indiv
-  }
-
   const handleGenerarExcel = async () => {
     if (!tropaSeleccionada) return
     setGenerando('excel')
@@ -152,12 +127,12 @@ export function Planilla01Module({ operador }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tropaId: tropaSeleccionada.id })
       })
-
+      
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))
         throw new Error(errorData.error || 'Error al generar Excel')
       }
-
+      
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -182,134 +157,138 @@ export function Planilla01Module({ operador }: Props) {
     try {
       const doc = new jsPDF('landscape', 'mm', 'a4')
       const pageWidth = doc.internal.pageSize.getWidth()
-      const pageHeight = doc.internal.pageSize.getHeight()
+      const m = 8 // margin
+      let y = 10
 
-      // Cálculos
-      const kgNetosCamion = getKgNetosCamion()
-      const kgNetosIndividuales = getKgNetosIndividuales()
-      const diferenciaKg = getDiferencia()
-
-      // Título principal
+      // ===== ENCABEZADO =====
       doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
-      doc.text('PLANILLA 01 - BOVINO', 10, 12)
-
-      // Tropa N° GRANDE a la derecha
+      doc.text('PLANILLA 01 - BOVINO', m, y)
       doc.setFontSize(20)
-      doc.text(`TROPA N° ${tropaSeleccionada.numero}`, pageWidth - 10, 12, { align: 'right' })
-
-      // Subtítulo
+      doc.text(`TROPA N\u00b0 ${tropaSeleccionada.numero || tropaSeleccionada.codigo || '-'}`, pageWidth - m, y, { align: 'right' })
+      y += 5
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
-      doc.text('REGISTRO DE INGRESO DE HACIENDA', pageWidth / 2, 17, { align: 'center' })
+      doc.text('REGISTRO DE INGRESO DE HACIENDA', pageWidth / 2, y, { align: 'center' })
+      y += 6
 
-      // Datos del establecimiento
+      // ===== ESTABLECIMIENTO =====
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
-      doc.text('ESTABLECIMIENTO: SOLEMAR ALIMENTARIA S.A.', 10, 20)
+      doc.text('ESTABLECIMIENTO: SOLEMAR ALIMENTARIA S.A.', m, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(`N° SENASA: 3986`, 90, 20)
-      doc.text(`MATRÍCULA: 300`, 140, 20)
-
-      // Semana y fecha
-      const getSemana = (fecha: string) => {
+      doc.text('SENASA: 3986', m + 100, y)
+      doc.text('MATR\u00cdCULA: 300', m + 130, y)
+      const getSem = (fecha: string) => {
         const d = new Date(fecha)
         const start = new Date(d.getFullYear(), 0, 1)
         return Math.ceil(((d.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7)
       }
+      doc.setFont('helvetica', 'bold')
+      doc.text('Sem.:', m + 170, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(getSem(tropaSeleccionada.fechaRecepcion).toString(), m + 180, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Fecha:', m + 200, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(new Date(tropaSeleccionada.fechaRecepcion).toLocaleDateString('es-AR'), m + 212, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Hora:', m + 240, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tropaSeleccionada.fechaRecepcion ? new Date(tropaSeleccionada.fechaRecepcion).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '-', m + 252, y)
+      y += 5
 
-      doc.text(`SEMANA N°: ${getSemana(tropaSeleccionada.fechaRecepcion)}`, 185, 20)
-      doc.text(`FECHA: ${new Date(tropaSeleccionada.fechaRecepcion).toLocaleDateString('es-AR')}`, 235, 20)
-      doc.text(`HORA: ${new Date(tropaSeleccionada.fechaRecepcion).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`, 275, 20)
-
-      // Línea separadora
+      // L\u00ednea separadora
       doc.setDrawColor(0)
       doc.setLineWidth(0.5)
-      doc.line(10, 22, pageWidth - 10, 22)
+      doc.line(m, y, pageWidth - m, y)
+      y += 4
 
-      // Datos productor/usuario faena
-      let y = 27
-      doc.setFontSize(8)
+      // --- Fila 1: Productor ---
       doc.setFont('helvetica', 'bold')
-      doc.text('PRODUCTOR:', 10, y)
+      doc.text('PRODUCTOR:', m, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.productor?.nombre || '-', 30, y)
+      doc.text(tropaSeleccionada.productor?.nombre || '-', m + 20, y)
       doc.setFont('helvetica', 'bold')
-      doc.text('CUIT:', 150, y)
+      doc.text('CUIT:', m + 120, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.productor?.cuit || '-', 162, y)
+      doc.text(tropaSeleccionada.productor?.cuit || '-', m + 132, y)
       doc.setFont('helvetica', 'bold')
-      doc.text('TROPA N\u00b0:', 220, y)
+      doc.text('TROPA N\u00b0:', m + 190, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.numero?.toString() || tropaSeleccionada.codigo || '-', 243, y)
+      doc.text(tropaSeleccionada.numero?.toString() || tropaSeleccionada.codigo || '-', m + 212, y)
       doc.setFont('helvetica', 'bold')
-      doc.text('CABEZAS:', 268, y)
+      doc.text('CABEZAS:', m + 245, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(String(tropaSeleccionada.cantidadCabezas), 291, y)
-
+      doc.text(String(tropaSeleccionada.cantidadCabezas), m + 268, y)
       y += 5
+
       // --- Fila 2: Usuario Faena ---
       doc.setFont('helvetica', 'bold')
-      doc.text('USUARIO FAENA:', 10, y)
+      doc.text('USUARIO FAENA:', m, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.usuarioFaena?.nombre || '-', 38, y)
+      doc.text(tropaSeleccionada.usuarioFaena?.nombre || '-', m + 28, y)
       doc.setFont('helvetica', 'bold')
-      doc.text('CUIT:', 150, y)
+      doc.text('CUIT:', m + 120, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.usuarioFaena?.cuit || '-', 162, y)
+      doc.text(tropaSeleccionada.usuarioFaena?.cuit || '-', m + 132, y)
       doc.setFont('helvetica', 'bold')
-      doc.text('CORRAL:', 220, y)
+      doc.text('CORRAL:', m + 190, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.corral?.nombre || '-', 245, y)
-
+      doc.text(tropaSeleccionada.corral?.nombre || '-', m + 212, y)
       y += 5
-      doc.setFont('helvetica', 'bold')
-      doc.text('TRANSPORTE:', 10, y)
-      doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.pesajeCamion?.transportista?.nombre || '-', 30, y)
-      doc.setFont('helvetica', 'bold')
-      doc.text('CHOFER:', 130, y)
-      doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.pesajeCamion?.choferNombre || '-', 142, y)
-      doc.setFont('helvetica', 'bold')
-      doc.text('DNI:', 200, y)
-      doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.pesajeCamion?.choferDni || '-', 210, y)
 
+      // --- Transporte ---
+      doc.setFont('helvetica', 'bold')
+      doc.text('TRANSPORTE:', m, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tropaSeleccionada.pesajeCamion?.transportista?.nombre || '-', m + 24, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('CHOFER:', m + 90, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tropaSeleccionada.pesajeCamion?.choferNombre || '-', m + 107, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('DNI:', m + 150, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tropaSeleccionada.pesajeCamion?.choferDni || '-', m + 160, y)
       y += 5
-      doc.setFont('helvetica', 'bold')
-      doc.text('PATENTE CHASIS:', 10, y)
-      doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.pesajeCamion?.patenteChasis || '-', 38, y)
-      doc.setFont('helvetica', 'bold')
-      doc.text('ACOPLADO:', 70, y)
-      doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.pesajeCamion?.patenteAcoplado || '-', 90, y)
-      doc.setFont('helvetica', 'bold')
-      doc.text('PRECINTOS:', 130, y)
-      doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.pesajeCamion?.precintos || '-', 148, y)
-      doc.setFont('helvetica', 'bold')
-      doc.text('N\u00b0 PESADA:', 200, y)
-      doc.setFont('helvetica', 'normal')
-      doc.text(String(tropaSeleccionada.pesajeCamion?.numeroTicket || '-'), 220, y)
 
+      doc.setFont('helvetica', 'bold')
+      doc.text('PATENTE CHASIS:', m, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tropaSeleccionada.pesajeCamion?.patenteChasis || '-', m + 30, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('ACOPLADO:', m + 60, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tropaSeleccionada.pesajeCamion?.patenteAcoplado || '-', m + 82, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('PRECINTOS:', m + 120, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tropaSeleccionada.pesajeCamion?.precintos || '-', m + 142, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('N\u00b0 PESADA:', m + 190, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(String(tropaSeleccionada.pesajeCamion?.numeroTicket || '-'), m + 215, y)
       y += 5
+
       // --- Documentaci\u00f3n ---
       doc.setFont('helvetica', 'bold')
-      doc.text('GU\u00cdA:', 10, y)
+      doc.text('GU\u00cdA:', m, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.guia || '-', 28, y)
+      doc.text(tropaSeleccionada.guia || '-', m + 15, y)
       doc.setFont('helvetica', 'bold')
-      doc.text('DTE:', 150, y)
+      doc.text('DTE:', m + 120, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.dte || '-', 165, y)
+      doc.text(tropaSeleccionada.dte || '-', m + 132, y)
+      y += 5
 
-      y += 6
-      doc.line(10, y, pageWidth - 10, y)
+      // L\u00ednea separadora
+      doc.setDrawColor(0)
+      doc.setLineWidth(0.5)
+      doc.line(m, y, pageWidth - m, y)
       y += 3
 
-      // Tabla de animales
+      // ===== TABLA DE ANIMALES =====
       const animalesData = (tropaSeleccionada.animales || []).map((a, idx) => [
         idx + 1,
         a.caravana || '-',
@@ -319,151 +298,134 @@ export function Planilla01Module({ operador }: Props) {
         ''
       ])
 
+      const totalKg = (tropaSeleccionada.animales || []).reduce((sum, a) => sum + (a.pesajeIndividual?.peso || a.pesoVivo || 0), 0)
+      const totalAnimales = (tropaSeleccionada.animales || []).length
+      const pesoPromedio = totalAnimales > 0 ? totalKg / totalAnimales : 0
+      const kgNetosCamion = tropaSeleccionada.pesajeCamion?.pesoNeto ?? null
+      const diferenciaKg = kgNetosCamion !== null ? kgNetosCamion - totalKg : null
+
       autoTable(doc, {
         startY: y,
-        head: [['N°', 'CARAVANA', 'TIPO', 'RAZA', 'PESO (kg)', 'OBSERVACIONES']],
-        body: animalesData,
+        head: [['N\u00ba', 'TIPO', 'PESO ENTRADA (kg)', 'CARAVANA', 'CORRAL']],
+        body: animalesData.map(row => [row[0], row[2], row[4], row[1], tropaSeleccionada.corral?.nombre || '']),
         theme: 'grid',
         styles: { fontSize: 7, cellPadding: 1.5 },
         headStyles: { fillColor: [200, 200, 200], textColor: [0, 0, 0], fontStyle: 'bold' },
         columnStyles: {
-          0: { cellWidth: 12, halign: 'center' },
-          1: { cellWidth: 35, halign: 'center' },
-          2: { cellWidth: 25, halign: 'center' },
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 22, halign: 'center' },
+          2: { cellWidth: 30, halign: 'right' },
           3: { cellWidth: 35, halign: 'center' },
-          4: { cellWidth: 25, halign: 'right' },
-          5: { cellWidth: 50 }
+          4: { cellWidth: 20, halign: 'center' }
         },
-        foot: [
-          [
-            { content: `TOTAL: ${tropaSeleccionada.animales?.length || 0} cabezas`, colSpan: 2, styles: { fontStyle: 'bold' } },
-            { content: '', colSpan: 1 },
-            { content: 'SUMA KG:', colSpan: 1, styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: kgNetosIndividuales.toFixed(1), styles: { fontStyle: 'bold', halign: 'right' } },
-            { content: diferenciaKg !== null ? `Diff: ${diferenciaKg >= 0 ? '+' : ''}${diferenciaKg.toFixed(1)}` : '', styles: { fontStyle: 'bold', halign: 'center', textColor: diferenciaKg !== null && diferenciaKg < 0 ? [180, 0, 0] : [0, 100, 0] } }
-          ]
-        ],
-        footStyles: { fillColor: [245, 245, 245] }
+        margin: { left: m, right: m }
       })
 
-      // ===== TOTALES Y CUADROS COMPARATIVOS (debajo de la tabla) =====
-      let fy = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
-      const pesoTotalLocal = (tropaSeleccionada.animales || []).reduce((acc, a) => acc + (a.pesajeIndividual?.peso || a.pesoVivo || 0), 0)
-      const animalesConPesoLocal = (tropaSeleccionada.animales || []).filter(a => (a.pesajeIndividual?.peso || a.pesoVivo || 0) > 0).length
-      const pesoPromedioLocal = animalesConPesoLocal > 0 ? pesoTotalLocal / animalesConPesoLocal : 0
-
+      // ===== TOTALES =====
+      const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
-      doc.text(`TOTALES:  Cabezas: ${tropaSeleccionada.cantidadCabezas}  |  Suma Pesos Indiv.: ${pesoTotalLocal.toFixed(1)} kg  |  Peso Promedio: ${pesoPromedioLocal.toFixed(1)} kg`, 10, fy)
-      fy += 5
+      doc.text(`TOTALES:  Cabezas: ${totalAnimales}  |  Suma Pesos Indiv.: ${totalKg.toFixed(1)} kg  |  Peso Promedio: ${pesoPromedio.toFixed(1)} kg`, m, finalY)
 
+      // ===== 4 CUADROS COMPARATIVOS =====
+      let cy = finalY + 5
       doc.setDrawColor(0)
       doc.setLineWidth(0.3)
-      doc.line(10, fy, pageWidth - 10, fy)
-      fy += 2
+      doc.line(m, cy, pageWidth - m, cy)
+      cy += 2
 
-      const cbW = 55
-      const cbH = 12
-      const cbGap = 15
-      const cbStart = 10
+      const boxW = 55
+      const boxH = 14
+      const boxGap = 15
+      const bx = m
 
-      // Cuadro 1: Neto Camion
-      doc.setDrawColor(0, 0, 150)
-      doc.setFillColor(235, 240, 255)
-      doc.roundedRect(cbStart, fy, cbW, cbH, 1.5, 1.5, 'FD')
-      doc.setFontSize(6)
+      // Cuadro 1: Kg Netos Cami\u00f3n
+      doc.setDrawColor(120)
+      doc.setFillColor(240, 240, 240)
+      doc.roundedRect(bx, cy, boxW, boxH, 1.5, 1.5, 'FD')
+      doc.setFontSize(7)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(0, 0, 150)
-      doc.text('NETO CAMION', cbStart + 3, fy + 4)
-      doc.setFontSize(9)
+      doc.setTextColor(80)
+      doc.text('KG NETOS CAMI\u00d3N', bx + 3, cy + 4)
+      doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text(kgNetosCamion !== null ? kgNetosCamion.toFixed(1) + ' kg' : 'S/D', cbStart + 3, fy + 10)
-      doc.setTextColor(0, 0, 0)
+      doc.text(kgNetosCamion !== null ? kgNetosCamion.toFixed(1) + ' kg' : 'S/D', bx + 3, cy + 11)
+      doc.setTextColor(0)
 
-      // Cuadro 2: Neto Individuales
-      const cb2 = cbStart + cbW + cbGap
-      doc.setDrawColor(0, 100, 0)
-      doc.setFillColor(235, 250, 235)
-      doc.roundedRect(cb2, fy, cbW, cbH, 1.5, 1.5, 'FD')
-      doc.setFontSize(6)
+      // Cuadro 2: Kg Netos Individuales
+      const b2x = bx + boxW + boxGap
+      doc.setDrawColor(120)
+      doc.setFillColor(240, 240, 240)
+      doc.roundedRect(b2x, cy, boxW, boxH, 1.5, 1.5, 'FD')
+      doc.setFontSize(7)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(0, 100, 0)
-      doc.text('NETO INDIVIDUALES', cb2 + 3, fy + 4)
-      doc.setFontSize(9)
+      doc.setTextColor(80)
+      doc.text('KG NETOS INDIVIDUALES', b2x + 3, cy + 4)
+      doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text(kgNetosIndividuales.toFixed(1) + ' kg', cb2 + 3, fy + 10)
-      doc.setTextColor(0, 0, 0)
+      doc.text(totalKg.toFixed(1) + ' kg', b2x + 3, cy + 11)
+      doc.setTextColor(0)
 
       // Cuadro 3: Diferencia
-      const cb3 = cb2 + cbW + cbGap
-      if (diferenciaKg !== null) {
-        const esPos = diferenciaKg >= 0
-        const dR = esPos ? 180 : 220
-        doc.setDrawColor(dR, 0, 0)
-        doc.setFillColor(esPos ? 255 : 255, esPos ? 250 : 235, esPos ? 230 : 235)
-        doc.roundedRect(cb3, fy, cbW, cbH, 1.5, 1.5, 'FD')
-        doc.setFontSize(6)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(dR, 0, 0)
-        doc.text('DIFERENCIA (Camion - Indiv.)', cb3 + 3, fy + 4)
-        doc.setFontSize(9)
-        doc.setFont('helvetica', 'normal')
-        doc.text((esPos ? '+' : '') + diferenciaKg.toFixed(1) + ' kg', cb3 + 3, fy + 10)
-        doc.setTextColor(0, 0, 0)
-      } else {
-        doc.setDrawColor(150)
-        doc.setFillColor(245, 245, 245)
-        doc.roundedRect(cb3, fy, cbW, cbH, 1.5, 1.5, 'FD')
-        doc.setFontSize(6)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(150)
-        doc.text('DIFERENCIA', cb3 + 3, fy + 4)
-        doc.setFontSize(9)
-        doc.setFont('helvetica', 'normal')
-        doc.text('Sin pesada camion', cb3 + 3, fy + 10)
-        doc.setTextColor(0, 0, 0)
-      }
+      const b3x = b2x + boxW + boxGap
+      doc.setDrawColor(120)
+      doc.setFillColor(240, 240, 240)
+      doc.roundedRect(b3x, cy, boxW, boxH, 1.5, 1.5, 'FD')
+      doc.setFontSize(7)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(80)
+      doc.text('DIFERENCIA (Cam. - Indiv.)', b3x + 3, cy + 4)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text(diferenciaKg !== null ? ((diferenciaKg >= 0 ? '+' : '') + diferenciaKg.toFixed(1) + ' kg') : 'Sin pesada cami\u00f3n', b3x + 3, cy + 11)
+      doc.setTextColor(0)
 
       // Cuadro 4: Promedio
-      const cb4 = cb3 + cbW + cbGap
-      doc.setDrawColor(100, 100, 0)
-      doc.setFillColor(255, 252, 235)
-      doc.roundedRect(cb4, fy, 45, cbH, 1.5, 1.5, 'FD')
-      doc.setFontSize(6)
+      const b4x = b3x + boxW + boxGap
+      doc.setDrawColor(120)
+      doc.setFillColor(240, 240, 240)
+      doc.roundedRect(b4x, cy, 45, boxH, 1.5, 1.5, 'FD')
+      doc.setFontSize(7)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(100, 100, 0)
-      doc.text('PROMEDIO KG NETOS', cb4 + 3, fy + 4)
-      doc.setFontSize(9)
+      doc.setTextColor(80)
+      doc.text('PROMEDIO KG NETOS', b4x + 3, cy + 4)
+      doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text(pesoPromedioLocal.toFixed(1) + ' kg', cb4 + 3, fy + 10)
-      doc.setTextColor(0, 0, 0)
+      doc.text(pesoPromedio.toFixed(1) + ' kg', b4x + 3, cy + 11)
+      doc.setTextColor(0)
 
-      fy += cbH + 6
+      cy += boxH + 5
 
-      // Firmas
-      if (fy < pageHeight - 20) {
-        doc.setFontSize(8)
-        doc.text('_________________________', 50, fy)
-        doc.text('_________________________', 170, fy)
-        doc.setFontSize(7)
-        doc.text('FIRMA RESPONSABLE INGRESO', 35, fy + 5)
-        doc.text('FIRMA TRANSPORTISTA', 155, fy + 5)
+      // ===== OBSERVACIONES =====
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.text('OBSERVACIONES:', m, cy)
+      doc.rect(m, cy + 2, pageWidth - m * 2, 10)
+      if (tropaSeleccionada.observaciones) {
+        doc.setFont('helvetica', 'normal')
+        doc.text(tropaSeleccionada.observaciones, m + 2, cy + 7, { maxWidth: pageWidth - m * 2 - 4 })
       }
 
-      // Pie de página
+      cy += 18
+
+      // ===== FIRMAS =====
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.text('FIRMA RESPONSABLE:', m + 10, cy)
+      doc.text('SELLO:', pageWidth / 2 + 30, cy)
+      doc.rect(m + 5, cy + 3, 70, 15)
+      doc.rect(pageWidth / 2 + 25, cy + 3, 70, 15)
+
+      // ===== PIE DE P\u00c1GINA =====
       const pageCount = doc.getNumberOfPages()
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i)
         doc.setFontSize(7)
         doc.setFont('helvetica', 'normal')
-        doc.text(
-          `Página ${i} de ${pageCount}`,
-          pageWidth / 2,
-          pageHeight - 5,
-          { align: 'center' }
-        )
+        doc.text(`P\u00e1gina ${i} de ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 5, { align: 'center' })
       }
 
+      // Guardar
       doc.save(`Planilla01_${tropaSeleccionada.codigo?.replace(/\s/g, '_') || tropaSeleccionada.id}.pdf`)
       toast.success('PDF generado correctamente')
     } catch (error) {
@@ -474,20 +436,17 @@ export function Planilla01Module({ operador }: Props) {
     }
   }
 
+  // Las tropas ya vienen filtradas desde el servidor cuando hay búsqueda
+
   const getSemana = (fecha: string) => {
     const d = new Date(fecha)
     const start = new Date(d.getFullYear(), 0, 1)
     return Math.ceil(((d.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7)
   }
 
-  // ===== CÁLCULOS PARA KPI CARDS =====
-  const kgNetosCamion = getKgNetosCamion()
-  const kgNetosIndividuales = getKgNetosIndividuales()
-  const diferenciaKg = getDiferencia()
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100 p-3 md:p-5">
-      <div className="w-full space-y-5">
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         <EditableBlock bloqueId="header" label="Encabezado">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -514,21 +473,20 @@ export function Planilla01Module({ operador }: Props) {
           </div>
         </EditableBlock>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-5">
-          {/* ===== LISTA DE TROPAS ===== */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <EditableBlock bloqueId="lista-tropas" label="Lista de Tropas">
-            <Card className="border-0 shadow-md">
-              <CardHeader className="bg-stone-50 pb-3">
+            <Card className="border-0 shadow-md lg:col-span-1">
+              <CardHeader className="bg-stone-50">
                 <CardTitle className="text-lg">
                   <TextoEditable id="planilla01-seleccionar-tropa" original="Seleccionar Tropa" tag="span" />
                 </CardTitle>
                 <div className="flex gap-2 mt-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                    <Input
-                      placeholder="Código, productor, CUIT..."
-                      value={busqueda}
-                      onChange={(e) => setBusqueda(e.target.value)}
+                    <Input 
+                      placeholder="Código, productor, CUIT..." 
+                      value={busqueda} 
+                      onChange={(e) => setBusqueda(e.target.value)} 
                       className="pl-9"
                       onKeyDown={(e) => { if (e.key === 'Enter') handleBuscar() }}
                     />
@@ -539,15 +497,15 @@ export function Planilla01Module({ operador }: Props) {
                   </Button>
                 </div>
                 {busqueda && !mostrarTodas && (
-                  <button
-                    onClick={handleVerTodas}
+                  <button 
+                    onClick={handleVerTodas} 
                     className="text-xs text-amber-600 hover:text-amber-800 mt-1 underline"
                   >
                     Ver todas las tropas
                   </button>
                 )}
               </CardHeader>
-              <CardContent className="p-0 max-h-[calc(100vh-320px)] overflow-y-auto">
+              <CardContent className="p-0 max-h-[500px] overflow-y-auto">
                 {loading ? (
                   <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-amber-500" /></div>
                 ) : tropas.length === 0 ? (
@@ -558,13 +516,13 @@ export function Planilla01Module({ operador }: Props) {
                   <div className="divide-y">
                     {tropas.map((tropa) => (
                       <button key={tropa.id} onClick={() => handleSeleccionarTropa(tropa.id)}
-                        className={`w-full p-3 text-left hover:bg-stone-50 transition-colors ${tropaSeleccionada?.id === tropa.id ? 'bg-amber-50 border-l-4 border-amber-500' : ''}`}>
+                        className={`w-full p-4 text-left hover:bg-stone-50 transition-colors ${tropaSeleccionada?.id === tropa.id ? 'bg-amber-50 border-l-4 border-amber-500' : ''}`}>
                         <div className="flex items-center justify-between">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-stone-800 truncate">{tropa.codigo}</p>
-                            <p className="text-sm text-stone-500 truncate">{tropa.usuarioFaena?.nombre || tropa.productor?.nombre}</p>
+                          <div>
+                            <p className="font-medium text-stone-800">{tropa.codigo}</p>
+                            <p className="text-sm text-stone-500">{tropa.usuarioFaena?.nombre || tropa.productor?.nombre}</p>
                           </div>
-                          <div className="text-right ml-2 shrink-0">
+                          <div className="text-right">
                             <Badge variant="outline">{tropa.cantidadCabezas} cab.</Badge>
                             <p className="text-xs text-stone-400 mt-1">{new Date(tropa.fechaRecepcion).toLocaleDateString('es-AR')}</p>
                           </div>
@@ -577,184 +535,179 @@ export function Planilla01Module({ operador }: Props) {
             </Card>
           </EditableBlock>
 
-          {/* ===== VISTA PREVIA ===== */}
           <EditableBlock bloqueId="vista-previa" label="Vista Previa">
-            <Card className="border-0 shadow-md">
-              <CardHeader className="bg-stone-50 pb-3">
+            <Card className="border-0 shadow-md lg:col-span-2">
+              <CardHeader className="bg-stone-50">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Eye className="w-5 h-5" />
                   <TextoEditable id="planilla01-vista-previa" original="Vista Previa" tag="span" />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-5">
+              <CardContent className="p-6">
                 {!tropaSeleccionada ? (
-                  <div className="text-center py-16 text-stone-400">
+                  <div className="text-center py-12 text-stone-400">
                     <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
                     <p>
                       <TextoEditable id="planilla01-seleccione-tropa" original="Seleccione una tropa para ver la planilla" tag="span" />
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {/* Encabezado + Tropa grande + Badge */}
-                    <div className="border-2 border-stone-300 rounded-lg p-3 bg-white">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-amber-500" />
-                          <span className="font-semibold text-sm">Solemar Alimentaria S.A.</span>
-                          <span className="text-stone-400 text-xs">| N° SENASA: 3986 | Matrícula: 300</span>
+                  <div className="space-y-6">
+                    <div className="border-2 border-stone-300 rounded-lg p-4 bg-white">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-amber-500" />
+                            <span className="font-semibold">Solemar Alimentaria S.A.</span>
+                          </div>
+                          <div className="text-stone-600">
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-nro-senasa-label" original="N° SENASA:" tag="span" />
+                            </span> 3986
+                          </div>
+                          <div className="text-stone-600">
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-matricula-label" original="Matrícula:" tag="span" />
+                            </span> 300
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-stone-500 text-xs">
-                            <TextoEditable id="planilla01-semana-label" original="Semana N°:" tag="span" /> {getSemana(tropaSeleccionada.fechaRecepcion)}
-                          </span>
-                          <Badge className="bg-amber-100 text-amber-800 text-xs px-3 py-0.5">
+                        <div className="space-y-2 text-right">
+                          <Badge className="bg-amber-100 text-amber-800 text-base px-4 py-1">
                             <TextoEditable id="planilla01-badge" original="PLANILLA 01 - BOVINO" tag="span" />
                           </Badge>
+                          <div className="text-stone-600">
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-semana-label" original="Semana N°:" tag="span" />
+                            </span> {getSemana(tropaSeleccionada.fechaRecepcion)}
+                          </div>
                         </div>
-                      </div>
-                      {/* Tropa N° grande */}
-                      <div className="mt-1 pt-1 border-t border-stone-200">
-                        <span className="text-2xl font-bold text-amber-700">TROPA N° {tropaSeleccionada.numero}</span>
-                        {tropaSeleccionada.pesajeCamion?.numeroTicket && (
-                          <span className="text-sm text-stone-400 ml-4">N° Pesada: {tropaSeleccionada.pesajeCamion.numeroTicket}</span>
-                        )}
                       </div>
                     </div>
 
-                    {/* ===== KPI CARDS DE PESAJE ===== */}
-                    <div className="grid grid-cols-3 gap-3">
-                      {/* Kg Netos Camión */}
-                      <div className={`rounded-lg p-3 border ${kgNetosCamion !== null ? 'bg-blue-50 border-blue-200' : 'bg-stone-50 border-stone-200'}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Truck className="w-4 h-4 text-blue-600" />
-                          <span className="text-xs font-semibold text-stone-600 uppercase">Kg Netos Camión</span>
-                        </div>
-                        <p className={`text-xl font-bold ${kgNetosCamion !== null ? 'text-blue-700' : 'text-stone-400'}`}>
-                          {kgNetosCamion !== null ? `${kgNetosCamion.toFixed(1)}` : 'S/D'}
-                        </p>
-                        <p className="text-xs text-stone-500 mt-0.5">kg</p>
-                        {kgNetosCamion !== null && tropaSeleccionada.pesajeCamion && (
-                          <p className="text-[10px] text-stone-400 mt-1">
-                            B: {tropaSeleccionada.pesajeCamion.pesoBruto?.toFixed(1) || '-'} / T: {tropaSeleccionada.pesajeCamion.pesoTara?.toFixed(1) || '-'}{tropaSeleccionada.pesajeCamion.numeroTicket ? ` | Ticket: ${tropaSeleccionada.pesajeCamion.numeroTicket}` : ''}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Kg Netos Individuales */}
-                      <div className="rounded-lg p-3 border bg-green-50 border-green-200">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Scale className="w-4 h-4 text-green-600" />
-                          <span className="text-xs font-semibold text-stone-600 uppercase">Kg Individuales</span>
-                        </div>
-                        <p className="text-xl font-bold text-green-700">{kgNetosIndividuales.toFixed(1)}</p>
-                        <p className="text-xs text-stone-500 mt-0.5">kg (suma {tropaSeleccionada.animales?.filter(a => (a.pesajeIndividual?.peso || a.pesoVivo || 0) > 0).length || 0} animales)</p>
-                      </div>
-
-                      {/* Diferencia */}
-                      {diferenciaKg !== null ? (
-                        <div className={`rounded-lg p-3 border ${diferenciaKg >= 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
-                          <div className="flex items-center gap-2 mb-1">
-                            {diferenciaKg >= 0 ? <TrendingUp className="w-4 h-4 text-yellow-600" /> : <TrendingDown className="w-4 h-4 text-red-600" />}
-                            <span className="text-xs font-semibold text-stone-600 uppercase">Diferencia</span>
-                          </div>
-                          <p className={`text-xl font-bold ${diferenciaKg >= 0 ? 'text-yellow-700' : 'text-red-700'}`}>
-                            {diferenciaKg >= 0 ? '+' : ''}{diferenciaKg.toFixed(1)}
-                          </p>
-                          <p className="text-xs text-stone-500 mt-0.5">kg (camión - individuales)</p>
-                        </div>
-                      ) : (
-                        <div className="rounded-lg p-3 border bg-stone-50 border-stone-200">
-                          <div className="flex items-center gap-2 mb-1">
-                            <ArrowLeftRight className="w-4 h-4 text-stone-400" />
-                            <span className="text-xs font-semibold text-stone-600 uppercase">Diferencia</span>
-                          </div>
-                          <p className="text-xl font-bold text-stone-400">N/D</p>
-                          <p className="text-xs text-stone-400 mt-0.5">Sin pesaje de camión</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Datos en 4 columnas */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                      <div className="border rounded-lg p-3 bg-white space-y-1">
-                        <h4 className="font-semibold text-stone-700 flex items-center gap-1.5 text-sm">
-                          <User className="w-3.5 h-3.5 text-amber-500" />
-                          <TextoEditable id="planilla01-productor-title" original="Productor" tag="span" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="border rounded-lg p-4 bg-white space-y-2">
+                        <h4 className="font-semibold text-stone-700 flex items-center gap-2">
+                          <User className="w-4 h-4 text-amber-500" />
+                          <TextoEditable id="planilla01-productor-title" original="Usuario Faena" tag="span" />
                         </h4>
-                        <p className="text-xs text-stone-600 truncate">{tropaSeleccionada.productor?.nombre || '-'}</p>
-                        <p className="text-xs text-stone-500">CUIT: {tropaSeleccionada.productor?.cuit || '-'}</p>
+                        <div className="text-sm space-y-1">
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-nombre-label" original="Nombre:" tag="span" />
+                            </span> {tropaSeleccionada.usuarioFaena?.nombre || tropaSeleccionada.productor?.nombre || '-'}
+                          </p>
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-cuit-label" original="CUIT:" tag="span" />
+                            </span> {tropaSeleccionada.usuarioFaena?.cuit || tropaSeleccionada.productor?.cuit || '-'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="border rounded-lg p-3 bg-white space-y-1">
-                        <h4 className="font-semibold text-stone-700 flex items-center gap-1.5 text-sm">
-                          <User className="w-3.5 h-3.5 text-amber-500" />
-                          <TextoEditable id="planilla01-usuario-title" original="Usuario Faena" tag="span" />
+                      <div className="border rounded-lg p-4 bg-white space-y-2">
+                        <h4 className="font-semibold text-stone-700 flex items-center gap-2">
+                          <User className="w-4 h-4 text-amber-500" />
+                          <TextoEditable id="planilla01-usuario-title" original="Productor / Titular" tag="span" />
                         </h4>
-                        <p className="text-xs text-stone-600 truncate">{tropaSeleccionada.usuarioFaena?.nombre || '-'}</p>
-                        <p className="text-xs text-stone-500">CUIT: {tropaSeleccionada.usuarioFaena?.cuit || '-'}</p>
+                        <div className="text-sm space-y-1">
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-nombre-label2" original="Nombre:" tag="span" />
+                            </span> {tropaSeleccionada.productor?.nombre || '-'}
+                          </p>
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-cuit-label2" original="CUIT:" tag="span" />
+                            </span> {tropaSeleccionada.productor?.cuit || '-'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="border rounded-lg p-3 bg-white space-y-1">
-                        <h4 className="font-semibold text-stone-700 flex items-center gap-1.5 text-sm">
-                          <Truck className="w-3.5 h-3.5 text-amber-500" />
+                      <div className="border rounded-lg p-4 bg-white space-y-2">
+                        <h4 className="font-semibold text-stone-700 flex items-center gap-2">
+                          <Truck className="w-4 h-4 text-amber-500" />
                           <TextoEditable id="planilla01-transporte-title" original="Transporte" tag="span" />
                         </h4>
-                        <p className="text-xs text-stone-600 truncate">{tropaSeleccionada.pesajeCamion?.transportista?.nombre || '-'}</p>
-                        <p className="text-xs text-stone-500">{tropaSeleccionada.pesajeCamion?.patenteChasis || '-'}{tropaSeleccionada.pesajeCamion?.patenteAcoplado ? ` / ${tropaSeleccionada.pesajeCamion.patenteAcoplado}` : ''}</p>
+                        <div className="text-sm space-y-1">
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-transportista-label" original="Transportista:" tag="span" />
+                            </span> {tropaSeleccionada.pesajeCamion?.transportista?.nombre || '-'}
+                          </p>
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-chofer-label" original="Chofer:" tag="span" />
+                            </span> {tropaSeleccionada.pesajeCamion?.choferNombre || '-'}
+                          </p>
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-patente-label" original="Patente Chasis:" tag="span" />
+                            </span> {tropaSeleccionada.pesajeCamion?.patenteChasis || '-'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="border rounded-lg p-3 bg-white space-y-1">
-                        <h4 className="font-semibold text-stone-700 flex items-center gap-1.5 text-sm">
-                          <FileText className="w-3.5 h-3.5 text-amber-500" />
+                      <div className="border rounded-lg p-4 bg-white space-y-2">
+                        <h4 className="font-semibold text-stone-700 flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-amber-500" />
                           <TextoEditable id="planilla01-documentos-title" original="Documentos" tag="span" />
                         </h4>
-                        <p className="text-xs text-stone-600">DTE: {tropaSeleccionada.dte || '-'}</p>
-                        <p className="text-xs text-stone-500">Guía: {tropaSeleccionada.guia || '-'}</p>
+                        <div className="text-sm space-y-1">
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-nro-tropa-label" original="N° Tropa:" tag="span" />
+                            </span> {tropaSeleccionada.codigo}
+                          </p>
+                          <p>
+                            <span className="font-medium">DTE:</span> {tropaSeleccionada.dte || '-'}
+                          </p>
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-guia-label" original="Guía:" tag="span" />
+                            </span> {tropaSeleccionada.guia || '-'}
+                          </p>
+                          <p>
+                            <span className="font-medium">
+                              <TextoEditable id="planilla01-precintos-label" original="Precintos:" tag="span" />
+                            </span> {tropaSeleccionada.pesajeCamion?.precintos || '-'}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Tabla de animales */}
                     <div className="border rounded-lg overflow-hidden bg-white">
-                      <div className="bg-stone-100 px-4 py-2 border-b flex items-center justify-between">
-                        <h4 className="font-semibold text-stone-700 text-sm">
+                      <div className="bg-stone-100 px-4 py-2 border-b">
+                        <h4 className="font-semibold text-stone-700">
                           <TextoEditable id="planilla01-detalle-animales" original="Detalle de Animales" tag="span" /> ({tropaSeleccionada.animales?.length || 0})
                         </h4>
-                        <span className="text-xs text-stone-500">
-                          Total: {kgNetosIndividuales.toFixed(1)} kg
-                          {diferenciaKg !== null && (
-                            <span className={`ml-3 font-semibold ${diferenciaKg >= 0 ? 'text-yellow-600' : 'text-red-600'}`}>
-                              Diff: {diferenciaKg >= 0 ? '+' : ''}{diferenciaKg.toFixed(1)} kg
-                            </span>
-                          )}
-                        </span>
                       </div>
-                      <div className="max-h-[300px] overflow-y-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-stone-50">
-                              <TableHead className="w-14 text-center text-xs">N°</TableHead>
-                              <TableHead className="text-center text-xs">Tipo</TableHead>
-                              <TableHead className="text-xs">Raza</TableHead>
-                              <TableHead className="text-xs">Caravana</TableHead>
-                              <TableHead className="text-right text-xs">Peso (kg)</TableHead>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-stone-50">
+                            <TableHead className="w-16 text-center">N°</TableHead>
+                            <TableHead className="text-center">
+                              <TextoEditable id="planilla01-th-tipo" original="Tipo" tag="span" />
+                            </TableHead>
+                            <TableHead>
+                              <TextoEditable id="planilla01-th-raza" original="Raza" tag="span" />
+                            </TableHead>
+                            <TableHead>
+                              <TextoEditable id="planilla01-th-caravana" original="Caravana" tag="span" />
+                            </TableHead>
+                            <TableHead className="text-right">
+                              <TextoEditable id="planilla01-th-peso" original="Peso (kg)" tag="span" />
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tropaSeleccionada.animales?.slice(0, 20).map((animal, idx) => (
+                            <TableRow key={animal.id}>
+                              <TableCell className="text-center font-medium">{animal.numero || idx + 1}</TableCell>
+                              <TableCell className="text-center"><Badge variant="outline">{TIPOS_ANIMAL_LABELS[animal.tipoAnimal] || animal.tipoAnimal}</Badge></TableCell>
+                              <TableCell>{animal.raza || '-'}</TableCell>
+                              <TableCell className="font-mono text-sm">{animal.caravana || '-'}</TableCell>
+                              <TableCell className="text-right">{animal.pesoVivo?.toFixed(0) || '-'}</TableCell>
                             </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {tropaSeleccionada.animales?.map((animal, idx) => (
-                              <TableRow key={animal.id}>
-                                <TableCell className="text-center font-medium text-xs">{animal.numero || idx + 1}</TableCell>
-                                <TableCell className="text-center"><Badge variant="outline" className="text-xs">{TIPOS_ANIMAL_LABELS[animal.tipoAnimal] || animal.tipoAnimal}</Badge></TableCell>
-                                <TableCell className="text-xs">{animal.raza || '-'}</TableCell>
-                                <TableCell className="font-mono text-xs">{animal.caravana || '-'}</TableCell>
-                                <TableCell className="text-right font-mono text-xs">{(animal.pesajeIndividual?.peso || animal.pesoVivo)?.toFixed(1) || '-'}</TableCell>
-                              </TableRow>
-                            ))}
-                            {(!tropaSeleccionada.animales || tropaSeleccionada.animales.length === 0) && (
-                              <TableRow>
-                                <TableCell colSpan={5} className="text-center py-6 text-stone-400 text-sm">Sin animales cargados</TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
                 )}
