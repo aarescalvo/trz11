@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
-    doc.text('FORMULARIO DE INGRESO DE HACIENDA', pageWidth / 2, y, { align: 'center' })
+    doc.text('REGISTRO DE INGRESO DE HACIENDA', pageWidth / 2, y, { align: 'center' })
     y += 6
 
     // ===== DATOS DEL ESTABLECIMIENTO (fila horizontal) =====
@@ -194,69 +194,18 @@ export async function GET(request: NextRequest) {
     doc.text('Corral:', margin + 100, y)
     doc.setFont('helvetica', 'normal')
     doc.text(tropa.corral?.nombre || '-', margin + 115, y)
-    // Ticket de pesada
+    // N° de pesada de camión (Ticket)
     doc.setFont('helvetica', 'bold')
-    doc.text('Ticket Pesada:', margin + 150, y)
+    doc.text('N° Pesada:', margin + 150, y)
     doc.setFont('helvetica', 'normal')
     doc.text(String(tropa.pesajeCamion?.numeroTicket || '-'), margin + 180, y)
     y += datosRow + 1
 
-    // ===== COMPARATIVO DE PESAJE (fila horizontal compacta) =====
+    // Línea separadora
     doc.setDrawColor(0)
     doc.setLineWidth(0.5)
     doc.line(margin, y, pageWidth - margin, y)
-    y += 2
-
-    // Fila compacta: label + valor horizontal
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.text('PESAJE:', margin, y + 4)
-
-    // Bruto
-    doc.setFontSize(7)
-    doc.text('Bruto:', margin + 22, y + 2)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.text(tropa.pesajeCamion?.pesoBruto ? tropa.pesajeCamion.pesoBruto.toFixed(1) : '-', margin + 32, y + 2)
-    // Tara
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.text('Tara:', margin + 60, y + 2)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.text(tropa.pesajeCamion?.pesoTara ? tropa.pesajeCamion.pesoTara.toFixed(1) : '-', margin + 68, y + 2)
-    // Neto Camión
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.setTextColor(0, 0, 150)
-    doc.text('NETO CAMIÓN:', margin + 98, y + 2)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(11)
-    doc.text(kgNetosCamion !== null ? kgNetosCamion.toFixed(1) + ' kg' : 'S/D', margin + 125, y + 2)
-    doc.setTextColor(0, 0, 0)
-    // Neto Individuales
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.setTextColor(0, 100, 0)
-    doc.text('NETO INDIVID.:', margin + 165, y + 2)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(11)
-    doc.text(kgNetosIndividuales.toFixed(1) + ' kg', margin + 195, y + 2)
-    doc.setTextColor(0, 0, 0)
-    // Diferencia
-    if (diferenciaKg !== null) {
-      const esPositivo = diferenciaKg >= 0
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7)
-      doc.setTextColor(esPositivo ? 150 : 200, 0, 0)
-      doc.text('DIFERENCIA:', margin + 230, y + 2)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(11)
-      doc.text((esPositivo ? '+' : '') + diferenciaKg.toFixed(1) + ' kg', margin + 257, y + 2)
-      doc.setTextColor(0, 0, 0)
-    }
-
-    y += 8
+    y += 3
 
     // ===== TABLA DE ANIMALES =====
     doc.setFontSize(9)
@@ -330,33 +279,104 @@ export async function GET(request: NextRequest) {
     })
 
     // ===== TOTALES (debajo de la tabla) =====
-    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
 
-    // Verificar si hay espacio, si no, nueva página
-    if (y > pageHeight - 35) {
-      doc.addPage()
-      y = 15
-    }
+    const pesoTotal = tropa.animales.reduce((acc, a) => acc + (a.pesajeIndividual?.peso || a.pesoVivo || 0), 0)
+    const pesoPromedio = tropa.animales.length > 0 ? pesoTotal / tropa.animales.filter(a => (a.pesajeIndividual?.peso || a.pesoVivo || 0) > 0).length : 0
 
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
-    doc.text('TOTALES:', margin, y)
+    doc.text(`TOTALES:  Cabezas: ${tropa.cantidadCabezas}  |  Suma Pesos Indiv.: ${pesoTotal.toFixed(1)} kg  |  Peso Promedio: ${pesoPromedio.toFixed(1)} kg`, margin, y)
 
+    y += 5
+
+    // ===== 3 CUADROS COMPARATIVOS (más chicos, debajo de la tabla) =====
+    doc.setDrawColor(0)
+    doc.setLineWidth(0.3)
+    doc.line(margin, y, pageWidth - margin, y)
+    y += 2
+
+    const boxW = 55
+    const boxH = 12
+    const boxGap = 15
+    const boxStartX = margin
+
+    // Cuadro 1: Kg Netos Camión
+    doc.setDrawColor(0, 0, 150)
+    doc.setFillColor(235, 240, 255)
+    doc.roundedRect(boxStartX, y, boxW, boxH, 1.5, 1.5, 'FD')
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0, 0, 150)
+    doc.text('NETO CAMIÓN', boxStartX + 3, y + 4)
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Cabezas: ${tropa.cantidadCabezas}`, margin + 20, y)
-    const pesoTotal = tropa.animales.reduce((acc, a) => acc + (a.pesajeIndividual?.peso || a.pesoVivo || 0), 0)
-    doc.text(`Suma Pesos Indiv.: ${pesoTotal.toFixed(1)} kg`, margin + 55, y)
-    if (kgNetosCamion !== null) {
-      doc.text(`Peso Neto Camión: ${kgNetosCamion.toFixed(1)} kg`, margin + 115, y)
-      const signo = diferenciaKg !== null ? (diferenciaKg >= 0 ? '+' : '') : ''
-      doc.text(`Diferencia: ${signo}${diferenciaKg?.toFixed(1)} kg`, margin + 195, y)
+    doc.text(kgNetosCamion !== null ? kgNetosCamion.toFixed(1) + ' kg' : 'S/D', boxStartX + 3, y + 10)
+    doc.setTextColor(0, 0, 0)
+
+    // Cuadro 2: Kg Netos Individuales
+    const box2X = boxStartX + boxW + boxGap
+    doc.setDrawColor(0, 100, 0)
+    doc.setFillColor(235, 250, 235)
+    doc.roundedRect(box2X, y, boxW, boxH, 1.5, 1.5, 'FD')
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0, 100, 0)
+    doc.text('NETO INDIVIDUALES', box2X + 3, y + 4)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.text(kgNetosIndividuales.toFixed(1) + ' kg', box2X + 3, y + 10)
+    doc.setTextColor(0, 0, 0)
+
+    // Cuadro 3: Diferencia
+    const box3X = box2X + boxW + boxGap
+    if (diferenciaKg !== null) {
+      const esPositivo = diferenciaKg >= 0
+      const diffR = esPositivo ? 180 : 220
+      doc.setDrawColor(diffR, 0, 0)
+      doc.setFillColor(esPositivo ? 255 : 255, esPositivo ? 250 : 235, esPositivo ? 230 : 235)
+      doc.roundedRect(box3X, y, boxW, boxH, 1.5, 1.5, 'FD')
+      doc.setFontSize(6)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(diffR, 0, 0)
+      doc.text('DIFERENCIA (Camión - Indiv.)', box3X + 3, y + 4)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text((esPositivo ? '+' : '') + diferenciaKg.toFixed(1) + ' kg', box3X + 3, y + 10)
+      doc.setTextColor(0, 0, 0)
+    } else {
+      doc.setDrawColor(150)
+      doc.setFillColor(245, 245, 245)
+      doc.roundedRect(box3X, y, boxW, boxH, 1.5, 1.5, 'FD')
+      doc.setFontSize(6)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(150)
+      doc.text('DIFERENCIA', box3X + 3, y + 4)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Sin pesada camión', box3X + 3, y + 10)
+      doc.setTextColor(0, 0, 0)
     }
 
-    const pesoPromedio = tropa.animales.length > 0 ? pesoTotal / tropa.animales.filter(a => (a.pesajeIndividual?.peso || a.pesoVivo || 0) > 0).length : 0
-    y += 5
-    doc.text(`Peso Promedio: ${pesoPromedio.toFixed(1)} kg`, margin + 55, y)
+    // Cuadro 4: Promedio Kg Netos (más chico)
+    const box4X = box3X + boxW + boxGap
+    doc.setDrawColor(100, 100, 0)
+    doc.setFillColor(255, 252, 235)
+    doc.roundedRect(box4X, y, 45, boxH, 1.5, 1.5, 'FD')
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(100, 100, 0)
+    doc.text('PROMEDIO KG NETOS', box4X + 3, y + 4)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.text(pesoPromedio.toFixed(1) + ' kg', box4X + 3, y + 10)
+    doc.setTextColor(0, 0, 0)
 
-    y += 8
+    y += boxH + 4
+    doc.setDrawColor(0)
+    doc.setLineWidth(0.3)
+    doc.line(margin, y, pageWidth - margin, y)
+    y += 3
 
     // ===== OBSERVACIONES =====
     doc.setFontSize(8)

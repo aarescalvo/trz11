@@ -198,6 +198,11 @@ export function Planilla01Module({ operador }: Props) {
       doc.setFontSize(20)
       doc.text(`TROPA N° ${tropaSeleccionada.numero}`, pageWidth - 10, 12, { align: 'right' })
 
+      // Subtítulo
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text('REGISTRO DE INGRESO DE HACIENDA', pageWidth / 2, 17, { align: 'center' })
+
       // Datos del establecimiento
       doc.setFontSize(8)
       doc.setFont('helvetica', 'bold')
@@ -270,68 +275,21 @@ export function Planilla01Module({ operador }: Props) {
       doc.setFont('helvetica', 'normal')
       doc.text(tropaSeleccionada.pesajeCamion?.precintos || '-', 148, y)
       doc.setFont('helvetica', 'bold')
-      doc.text('DTE:', 200, y)
+      doc.text('N° Pesada:', 200, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.dte || '-', 212, y)
+      doc.text(String(tropaSeleccionada.pesajeCamion?.numeroTicket || '-'), 220, y)
       doc.setFont('helvetica', 'bold')
-      doc.text('GUÍA:', 240, y)
+      doc.text('DTE:', 245, y)
       doc.setFont('helvetica', 'normal')
-      doc.text(tropaSeleccionada.guia || '-', 254, y)
+      doc.text(tropaSeleccionada.dte || '-', 254, y)
+      doc.setFont('helvetica', 'bold')
+      doc.text('GUÍA:', 270, y)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tropaSeleccionada.guia || '-', 282, y)
 
       y += 6
       doc.line(10, y, pageWidth - 10, y)
-      y += 2
-
-      // ===== COMPARATIVO DE PESAJE (fila horizontal compacta) =====
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'bold')
-      doc.text('PESAJE:', 10, y + 4)
-
-      // Bruto
-      doc.setFontSize(7)
-      doc.text('Bruto:', 32, y + 2)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.text(tropaSeleccionada.pesajeCamion?.pesoBruto ? tropaSeleccionada.pesajeCamion.pesoBruto.toFixed(1) : '-', 42, y + 2)
-      // Tara
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7)
-      doc.text('Tara:', 70, y + 2)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.text(tropaSeleccionada.pesajeCamion?.pesoTara ? tropaSeleccionada.pesajeCamion.pesoTara.toFixed(1) : '-', 78, y + 2)
-      // Neto Camión
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7)
-      doc.setTextColor(0, 0, 150)
-      doc.text('NETO CAMIÓN:', 108, y + 2)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(11)
-      doc.text(kgNetosCamion !== null ? kgNetosCamion.toFixed(1) + ' kg' : 'S/D', 135, y + 2)
-      doc.setTextColor(0, 0, 0)
-      // Neto Individuales
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7)
-      doc.setTextColor(0, 100, 0)
-      doc.text('NETO INDIV.:', 175, y + 2)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(11)
-      doc.text(kgNetosIndividuales.toFixed(1) + ' kg', 205, y + 2)
-      doc.setTextColor(0, 0, 0)
-      // Diferencia
-      if (diferenciaKg !== null) {
-        const esPositivo = diferenciaKg >= 0
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(7)
-        doc.setTextColor(esPositivo ? 150 : 200, 0, 0)
-        doc.text('DIFERENCIA:', 240, y + 2)
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(11)
-        doc.text((esPositivo ? '+' : '') + diferenciaKg.toFixed(1) + ' kg', 267, y + 2)
-        doc.setTextColor(0, 0, 0)
-      }
-
-      y += 8
+      y += 3
 
       // Tabla de animales
       const animalesData = (tropaSeleccionada.animales || []).map((a, idx) => [
@@ -370,15 +328,108 @@ export function Planilla01Module({ operador }: Props) {
         footStyles: { fillColor: [245, 245, 245] }
       })
 
+      // ===== TOTALES Y CUADROS COMPARATIVOS (debajo de la tabla) =====
+      let fy = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
+      const pesoTotalLocal = (tropaSeleccionada.animales || []).reduce((acc, a) => acc + (a.pesajeIndividual?.peso || a.pesoVivo || 0), 0)
+      const animalesConPesoLocal = (tropaSeleccionada.animales || []).filter(a => (a.pesajeIndividual?.peso || a.pesoVivo || 0) > 0).length
+      const pesoPromedioLocal = animalesConPesoLocal > 0 ? pesoTotalLocal / animalesConPesoLocal : 0
+
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`TOTALES:  Cabezas: ${tropaSeleccionada.cantidadCabezas}  |  Suma Pesos Indiv.: ${pesoTotalLocal.toFixed(1)} kg  |  Peso Promedio: ${pesoPromedioLocal.toFixed(1)} kg`, 10, fy)
+      fy += 5
+
+      doc.setDrawColor(0)
+      doc.setLineWidth(0.3)
+      doc.line(10, fy, pageWidth - 10, fy)
+      fy += 2
+
+      const cbW = 55
+      const cbH = 12
+      const cbGap = 15
+      const cbStart = 10
+
+      // Cuadro 1: Neto Camion
+      doc.setDrawColor(0, 0, 150)
+      doc.setFillColor(235, 240, 255)
+      doc.roundedRect(cbStart, fy, cbW, cbH, 1.5, 1.5, 'FD')
+      doc.setFontSize(6)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 0, 150)
+      doc.text('NETO CAMION', cbStart + 3, fy + 4)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text(kgNetosCamion !== null ? kgNetosCamion.toFixed(1) + ' kg' : 'S/D', cbStart + 3, fy + 10)
+      doc.setTextColor(0, 0, 0)
+
+      // Cuadro 2: Neto Individuales
+      const cb2 = cbStart + cbW + cbGap
+      doc.setDrawColor(0, 100, 0)
+      doc.setFillColor(235, 250, 235)
+      doc.roundedRect(cb2, fy, cbW, cbH, 1.5, 1.5, 'FD')
+      doc.setFontSize(6)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 100, 0)
+      doc.text('NETO INDIVIDUALES', cb2 + 3, fy + 4)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text(kgNetosIndividuales.toFixed(1) + ' kg', cb2 + 3, fy + 10)
+      doc.setTextColor(0, 0, 0)
+
+      // Cuadro 3: Diferencia
+      const cb3 = cb2 + cbW + cbGap
+      if (diferenciaKg !== null) {
+        const esPos = diferenciaKg >= 0
+        const dR = esPos ? 180 : 220
+        doc.setDrawColor(dR, 0, 0)
+        doc.setFillColor(esPos ? 255 : 255, esPos ? 250 : 235, esPos ? 230 : 235)
+        doc.roundedRect(cb3, fy, cbW, cbH, 1.5, 1.5, 'FD')
+        doc.setFontSize(6)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(dR, 0, 0)
+        doc.text('DIFERENCIA (Camion - Indiv.)', cb3 + 3, fy + 4)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        doc.text((esPos ? '+' : '') + diferenciaKg.toFixed(1) + ' kg', cb3 + 3, fy + 10)
+        doc.setTextColor(0, 0, 0)
+      } else {
+        doc.setDrawColor(150)
+        doc.setFillColor(245, 245, 245)
+        doc.roundedRect(cb3, fy, cbW, cbH, 1.5, 1.5, 'FD')
+        doc.setFontSize(6)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(150)
+        doc.text('DIFERENCIA', cb3 + 3, fy + 4)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        doc.text('Sin pesada camion', cb3 + 3, fy + 10)
+        doc.setTextColor(0, 0, 0)
+      }
+
+      // Cuadro 4: Promedio
+      const cb4 = cb3 + cbW + cbGap
+      doc.setDrawColor(100, 100, 0)
+      doc.setFillColor(255, 252, 235)
+      doc.roundedRect(cb4, fy, 45, cbH, 1.5, 1.5, 'FD')
+      doc.setFontSize(6)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(100, 100, 0)
+      doc.text('PROMEDIO KG NETOS', cb4 + 3, fy + 4)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text(pesoPromedioLocal.toFixed(1) + ' kg', cb4 + 3, fy + 10)
+      doc.setTextColor(0, 0, 0)
+
+      fy += cbH + 6
+
       // Firmas
-      const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15
-      if (finalY < pageHeight - 25) {
+      if (fy < pageHeight - 20) {
         doc.setFontSize(8)
-        doc.text('_________________________', 50, finalY)
-        doc.text('_________________________', 170, finalY)
+        doc.text('_________________________', 50, fy)
+        doc.text('_________________________', 170, fy)
         doc.setFontSize(7)
-        doc.text('FIRMA RESPONSABLE INGRESO', 35, finalY + 5)
-        doc.text('FIRMA TRANSPORTISTA', 155, finalY + 5)
+        doc.text('FIRMA RESPONSABLE INGRESO', 35, fy + 5)
+        doc.text('FIRMA TRANSPORTISTA', 155, fy + 5)
       }
 
       // Pie de página
@@ -548,7 +599,7 @@ export function Planilla01Module({ operador }: Props) {
                       <div className="mt-1 pt-1 border-t border-stone-200">
                         <span className="text-2xl font-bold text-amber-700">TROPA N° {tropaSeleccionada.numero}</span>
                         {tropaSeleccionada.pesajeCamion?.numeroTicket && (
-                          <span className="text-sm text-stone-400 ml-4">Ticket Pesada: {tropaSeleccionada.pesajeCamion.numeroTicket}</span>
+                          <span className="text-sm text-stone-400 ml-4">N° Pesada: {tropaSeleccionada.pesajeCamion.numeroTicket}</span>
                         )}
                       </div>
                     </div>

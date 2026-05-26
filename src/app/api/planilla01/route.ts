@@ -102,10 +102,12 @@ export async function POST(request: NextRequest) {
       [''],
     ]
 
-    // ===== SECCIÓN DE PESAJE COMPARATIVO =====
+    // ===== SECCIÓN DE PESAJE COMPARATIVO (después de animales, antes de firmas) =====
     const pesajeData = [
+      [''],
       ['COMPARATIVO DE PESAJE'],
       [''],
+      ['N° PESADA CAMIÓN:', tropa.pesajeCamion?.numeroTicket || '-'],
       ['KG NETOS CAMIÓN:', kgNetosCamion !== null ? kgNetosCamion : 'Sin datos', '', 'PESO BRUTO:', tropa.pesajeCamion?.pesoBruto || 'Sin datos', '', 'PESO TARA:', tropa.pesajeCamion?.pesoTara || 'Sin datos'],
       ['KG NETOS INDIVIDUALES (SUMA):', kgNetosIndividuales, '', 'CABEZAS CON PESO:', animalesConPeso, '', 'PESO PROMEDIO:', pesoPromedio.toFixed(1)],
       ['DIFERENCIA (Camión - Indiv.):', diferenciaKg !== null ? (diferenciaKg >= 0 ? '+' : '') + diferenciaKg.toFixed(1) + ' kg' : 'Sin datos de camión'],
@@ -125,19 +127,17 @@ export async function POST(request: NextRequest) {
       ''
     ])
 
-    // Totales
+    // Totales y firmas
     const footerData = [
-      [''],
       ['TOTAL ANIMALES:', totalAnimales, '', 'TOTAL KG INDIVIDUALES:', kgNetosIndividuales, '', 'TOTAL KG CAMIÓN:', kgNetosCamion || 'Sin datos'],
-      ['DIFERENCIA FINAL:', diferenciaKg !== null ? (diferenciaKg >= 0 ? '+' : '') + diferenciaKg.toFixed(1) + ' kg' : 'N/D'],
       [''],
       ['', '', '', '', '', '', ''],
       ['_________________________', '', '', '_________________________', '', '', '_________________________'],
       ['FIRMA RESPONSABLE INGRESO', '', '', 'FIRMA TRANSPORTISTA', '', '', 'SUPERVISOR'],
     ]
 
-    // Combinar todos los datos
-    const allData = [...headerData, ...pesajeData, ['DETALLE DE ANIMALES'], animalHeader, ...animalesData, ...footerData]
+    // Combinar todos los datos: header → animales → comparativo → firmas
+    const allData = [...headerData, ['DETALLE DE ANIMALES'], animalHeader, ...animalesData, ...pesajeData, ...footerData]
 
     // Agregar filas
     allData.forEach(row => ws.addRow(row))
@@ -154,27 +154,9 @@ export async function POST(request: NextRequest) {
     titleRow.font = { bold: true, size: 14 }
     titleRow.alignment = { horizontal: 'center' }
 
-    // Sección comparativo de pesaje - colorear filas importantes
-    const pesajeStartRow = headerData.length + 1 // fila donde empieza "COMPARATIVO DE PESAJE"
-    ws.getRow(pesajeStartRow).font = { bold: true, size: 11 }
-
-    // Fila KG NETOS CAMIÓN
-    const camionRow = ws.getRow(pesajeStartRow + 3)
-    camionRow.getCell(1).font = { bold: true }
-    camionRow.getCell(2).font = { bold: true, size: 12 }
-
-    // Fila KG NETOS INDIVIDUALES
-    const indivRow = ws.getRow(pesajeStartRow + 4)
-    indivRow.getCell(1).font = { bold: true }
-    indivRow.getCell(2).font = { bold: true, size: 12 }
-
-    // Fila DIFERENCIA
-    const diffRow = ws.getRow(pesajeStartRow + 5)
-    diffRow.getCell(1).font = { bold: true, size: 11 }
-    diffRow.getCell(2).font = { bold: true, size: 12, color: { argb: diferenciaKg !== null && diferenciaKg < 0 ? 'FFFF0000' : 'FF006600' } }
-
-    // Encabezado de animales
-    const animalHeaderRow = ws.getRow(pesajeStartRow + pesajeData.length + 1)
+    // Encabezado de animales (después del header)
+    const animalHeaderRowNum = headerData.length + 2 // +1 por ['DETALLE DE ANIMALES'], +1 por la fila del header
+    const animalHeaderRow = ws.getRow(animalHeaderRowNum)
     animalHeaderRow.font = { bold: true }
     animalHeaderRow.eachCell((cell) => {
       cell.border = {
@@ -183,14 +165,35 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Sección comparativo de pesaje (ahora después de animales)
+    const pesajeStartRow = headerData.length + 1 + 1 + 1 + (tropa.animales || []).length + pesajeData.indexOf(pesajeData.find(r => r[0] === 'COMPARATIVO DE PESAJE')!) + 1
+    const pesajeTitleRow = ws.getRow(pesajeStartRow)
+    pesajeTitleRow.font = { bold: true, size: 11 }
+
+    // Fila N° Pesada
+    const pesadaRow = ws.getRow(pesajeStartRow + 3)
+    pesadaRow.getCell(1).font = { bold: true }
+    pesadaRow.getCell(2).font = { bold: true, size: 12 }
+
+    // Fila KG NETOS CAMIÓN
+    const camionRow = ws.getRow(pesajeStartRow + 4)
+    camionRow.getCell(1).font = { bold: true }
+    camionRow.getCell(2).font = { bold: true, size: 12 }
+
+    // Fila KG NETOS INDIVIDUALES
+    const indivRow = ws.getRow(pesajeStartRow + 5)
+    indivRow.getCell(1).font = { bold: true }
+    indivRow.getCell(2).font = { bold: true, size: 12 }
+
+    // Fila DIFERENCIA
+    const diffRow = ws.getRow(pesajeStartRow + 6)
+    diffRow.getCell(1).font = { bold: true, size: 11 }
+    diffRow.getCell(2).font = { bold: true, size: 12, color: { argb: diferenciaKg !== null && diferenciaKg < 0 ? 'FFFF0000' : 'FF006600' } }
+
     // Totales finales
     const totalRow = allData.length - footerData.length + 1
     ws.getRow(totalRow).getCell(1).font = { bold: true }
     ws.getRow(totalRow).getCell(5).font = { bold: true }
-
-    const diffFinalRow = totalRow + 1
-    ws.getRow(diffFinalRow).getCell(1).font = { bold: true, size: 11 }
-    ws.getRow(diffFinalRow).getCell(2).font = { bold: true, size: 12, color: { argb: diferenciaKg !== null && diferenciaKg < 0 ? 'FFFF0000' : 'FF006600' } }
 
     // Generar buffer
     const buffer = await wb.xlsx.writeBuffer()
