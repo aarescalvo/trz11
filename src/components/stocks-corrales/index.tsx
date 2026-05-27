@@ -735,15 +735,15 @@ function setCell(
   row: number,
   col: number,
   value: string | number | null,
-  font: Partial<ExcelJS.Font> | undefined,
-  fill: Partial<ExcelJS.Fill> | undefined,
+  font: Partial<ExcelJS.Font> | null | undefined,
+  fill: Partial<ExcelJS.Fill> | null | undefined,
   alignment: Partial<ExcelJS.Alignment>,
   border: Partial<ExcelJS.Borders>
 ) {
   const cell = ws.getCell(row, col)
   cell.value = value ?? ''
   if (font) cell.font = font
-  if (fill) cell.fill = fill
+  if (fill) cell.fill = fill as ExcelJS.Fill
   if (alignment) cell.alignment = alignment
   if (border) cell.border = border
 }

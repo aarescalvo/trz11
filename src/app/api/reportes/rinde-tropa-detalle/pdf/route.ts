@@ -71,7 +71,8 @@ export async function GET(request: NextRequest) {
 
     const cfg = reporteConfig.pdf
     const fnt = cfg.fuentes
-    const colors = cfg.colores
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const colors = cfg.colores as any
     const sep = cfg.separacion
 
     // ===== GENERAR PDF =====
@@ -135,7 +136,7 @@ export async function GET(request: NextRequest) {
 
     doc.setFont('helvetica', 'bold')
     doc.text('Fecha Faena:', mg, y)
-    doc.setTextColor(...colors.fechaFaena)
+    const fc = colors.fechaFaena as number[]; doc.setTextColor(fc[0], fc[1], fc[2])
     doc.text(fechaFaena ? new Date(fechaFaena).toLocaleDateString('es-AR') : '-', mg + 25, y)
     doc.setTextColor(0)
     doc.text('N\u00ba Tropa:', mg + 155, y)
@@ -229,6 +230,9 @@ export async function GET(request: NextRequest) {
       `${(rindeGeneral * 100).toFixed(2)}%`
     ])
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ha = (v: string) => v as any
+
     autoTable(doc, {
       startY: y,
       head: [['N\u00ba Garr\u00f3n', 'N\u00ba Animal', 'Raza', 'Clasificaci\u00f3n', 'Caravana', 'Kg Entrada', 'Kg 1/2 A', 'Kg 1/2 B', 'Total Kg', 'Rinde Faena']],
@@ -237,16 +241,16 @@ export async function GET(request: NextRequest) {
       headStyles: { fillColor: colors.encabezadoTabla, textColor: colors.textoEncabezado, fontStyle: 'bold', fontSize: fnt.tamanoTablaEncabezado },
       bodyStyles: { fontSize: fnt.tamanoTablaCuerpo, cellPadding: 1.5 },
       columnStyles: {
-        0: { cellWidth: cfg.tablaAnimales.anchoColumnas.garron, halign: cfg.tablaAnimales.alineacion.garron },
-        1: { cellWidth: cfg.tablaAnimales.anchoColumnas.animal, halign: cfg.tablaAnimales.alineacion.animal },
-        2: { cellWidth: cfg.tablaAnimales.anchoColumnas.raza, halign: cfg.tablaAnimales.alineacion.raza },
-        3: { cellWidth: cfg.tablaAnimales.anchoColumnas.clasificacion, halign: cfg.tablaAnimales.alineacion.clasificacion },
-        4: { cellWidth: cfg.tablaAnimales.anchoColumnas.caravana, halign: cfg.tablaAnimales.alineacion.caravana },
-        5: { cellWidth: cfg.tablaAnimales.anchoColumnas.kgEntrada, halign: cfg.tablaAnimales.alineacion.kgEntrada },
-        6: { cellWidth: cfg.tablaAnimales.anchoColumnas.mediaA, halign: cfg.tablaAnimales.alineacion.mediaA },
-        7: { cellWidth: cfg.tablaAnimales.anchoColumnas.mediaB, halign: cfg.tablaAnimales.alineacion.mediaB },
-        8: { cellWidth: cfg.tablaAnimales.anchoColumnas.totalKg, halign: cfg.tablaAnimales.alineacion.totalKg },
-        9: { cellWidth: cfg.tablaAnimales.anchoColumnas.rinde, halign: cfg.tablaAnimales.alineacion.rinde }
+        0: { cellWidth: cfg.tablaAnimales.anchoColumnas.garron, halign: ha(cfg.tablaAnimales.alineacion.garron) },
+        1: { cellWidth: cfg.tablaAnimales.anchoColumnas.animal, halign: ha(cfg.tablaAnimales.alineacion.animal) },
+        2: { cellWidth: cfg.tablaAnimales.anchoColumnas.raza, halign: ha(cfg.tablaAnimales.alineacion.raza) },
+        3: { cellWidth: cfg.tablaAnimales.anchoColumnas.clasificacion, halign: ha(cfg.tablaAnimales.alineacion.clasificacion) },
+        4: { cellWidth: cfg.tablaAnimales.anchoColumnas.caravana, halign: ha(cfg.tablaAnimales.alineacion.caravana) },
+        5: { cellWidth: cfg.tablaAnimales.anchoColumnas.kgEntrada, halign: ha(cfg.tablaAnimales.alineacion.kgEntrada) },
+        6: { cellWidth: cfg.tablaAnimales.anchoColumnas.mediaA, halign: ha(cfg.tablaAnimales.alineacion.mediaA) },
+        7: { cellWidth: cfg.tablaAnimales.anchoColumnas.mediaB, halign: ha(cfg.tablaAnimales.alineacion.mediaB) },
+        8: { cellWidth: cfg.tablaAnimales.anchoColumnas.totalKg, halign: ha(cfg.tablaAnimales.alineacion.totalKg) },
+        9: { cellWidth: cfg.tablaAnimales.anchoColumnas.rinde, halign: ha(cfg.tablaAnimales.alineacion.rinde) }
       },
       didParseCell: (data: any) => {
         if (data.row.index === tableData.length - 1 && data.section === 'body') {

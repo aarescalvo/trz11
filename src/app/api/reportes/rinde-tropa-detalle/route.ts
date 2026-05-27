@@ -143,8 +143,8 @@ export async function POST(request: NextRequest) {
 
     ws.pageSetup = {
       paperSize: 9,
-      orientation: cfg.pagina.orientacion,
-      fitToPage: cfg.pagina.ajustarAncho,
+      orientation: cfg.pagina.orientacion as 'landscape' | 'portrait',
+      fitToPage: cfg.pagina.ajustarAncho as boolean,
       fitToWidth: 1,
       fitToHeight: 0,
       margins: {
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
         const logoPath = path.join(process.cwd(), 'public', 'logo.png')
         if (fs.existsSync(logoPath)) {
           const imgData = fs.readFileSync(logoPath)
-          const imgId = wb.addImage({ buffer: imgData, extension: 'png' })
+          const imgId = wb.addImage({ buffer: imgData as any, extension: 'png' })
           const imgCol = logoCfg.posicion === 'arriba-izquierda' ? 1 : logoCfg.posicion === 'arriba-derecha' ? 10 : 5
           ws.addImage(imgId, {
             tl: { col: imgCol - 1, row: 0 },
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
     applyCell(rindeLabelCell, {
       font: { name: fnt.familia, size: fnt.tamanoInfo, bold: true },
       border: doubleBorder,
-      alignment: { horizontal: 'center', vertical: 'center' }
+      alignment: { horizontal: 'center', vertical: 'middle' }
     })
 
     // RINDE valor (L3)
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
     applyCell(rindeValCell, {
       font: { name: fnt.familia, size: fnt.tamanoInfo, bold: true },
       border: doubleBorder,
-      alignment: { horizontal: 'center', vertical: 'center' },
+      alignment: { horizontal: 'center', vertical: 'middle' },
       numFmt: fmt.porcentaje
     })
 
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
     applyCell(promLabelCell, {
       font: { name: fnt.familia, size: fnt.tamanoInfo, bold: true },
       border: doubleBorder,
-      alignment: { horizontal: 'center', vertical: 'center' }
+      alignment: { horizontal: 'center', vertical: 'middle' }
     })
 
     // PROM. valor (L4)
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
     applyCell(promValCell, {
       font: { name: fnt.familia, size: fnt.tamanoInfo, bold: true },
       border: doubleBorder,
-      alignment: { horizontal: 'center', vertical: 'center' },
+      alignment: { horizontal: 'center', vertical: 'middle' },
       numFmt: fmt.kgDecimal
     })
 
@@ -491,7 +491,7 @@ export async function POST(request: NextRequest) {
       cell.value = h.text
       applyCell(cell, {
         font: { name: fnt.familia, size: fnt.tamanoDatos, bold: h.col === 13 },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
         border: { top: thinBorder.top, left: thinBorder.left, right: thinBorder.right }
       })
     }
@@ -712,21 +712,21 @@ export async function POST(request: NextRequest) {
     ws.getCell(`D${r}`).value = 'MENUDENCIA'
     applyCell(ws.getCell(`D${r}`), {
       font: { name: fnt.familia, size: fnt.tamanoMenudencia, bold: true },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
       border: { top: thinBorder.top, bottom: thinBorder.bottom, left: thinBorder.left, right: thinBorder.right }
     })
 
     ws.getCell(`H${r}`).value = 'Cantidades'
     applyCell(ws.getCell(`H${r}`), {
       font: { name: fnt.familia, size: fnt.tamanoMenudencia },
-      alignment: { horizontal: alin(alMen, 'cantidades', 'center'), vertical: 'center', wrapText: true },
+      alignment: { horizontal: alin(alMen, 'cantidades', 'center'), vertical: 'middle', wrapText: true },
       border: { top: thinBorder.top, bottom: thinBorder.bottom, left: thinBorder.left, right: thinBorder.right }
     })
 
     ws.getCell(`I${r}`).value = 'Kg'
     applyCell(ws.getCell(`I${r}`), {
       font: { name: fnt.familia, size: fnt.tamanoMenudencia },
-      alignment: { horizontal: alin(alMen, 'kg', 'center'), vertical: 'center', wrapText: true },
+      alignment: { horizontal: alin(alMen, 'kg', 'center'), vertical: 'middle', wrapText: true },
       border: { top: thinBorder.top, bottom: thinBorder.bottom, left: thinBorder.left, right: thinBorder.right }
     })
 

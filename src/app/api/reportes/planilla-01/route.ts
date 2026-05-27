@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
         animal.raza || '',
         peso ? peso.toFixed(1) : '',
         tropa.corral?.nombre || '',
-        animal.observaciones || ''
+        animal.pesajeIndividual?.observaciones || ''
       ]
     })
 
